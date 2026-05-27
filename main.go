@@ -40,7 +40,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Ошибка создания таблицы: %v", err)
 	}
-	fmt.Println("Таблица 'products' проверена/создана успешно.")
+	fmt.Println("✅ Таблица 'products' проверена/создана успешно.")
 
 	// Настройка HTTP-эндпоинта
 	http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
