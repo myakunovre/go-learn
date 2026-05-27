@@ -49,7 +49,7 @@ func main() {
 	})
 
 	// Запуск HTTP-сервера
-	fmt.Println("Сервер запущен на http://localhost:8080/hello")
+	fmt.Println("🌐 Сервер запущен на http://localhost:8080/hello")
 	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
