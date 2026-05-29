@@ -4,15 +4,15 @@ type DB interface {
 	DeleteProduct(int) error
 }
 
-type Service struct {
+type ProductService struct {
 	db DB
 }
 
-func NewService(db DB) *Service {
-	return &Service{db: db}
+func NewProductService(db DB) *ProductService {
+	return &ProductService{db: db}
 }
 
-func (s *Service) Delete(id int) error {
+func (s *ProductService) Delete(id int) error {
 	err := s.db.DeleteProduct(id)
 	return err
 }

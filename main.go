@@ -35,8 +35,8 @@ func main() {
 	// === СОЗДАЕМ ТАБЛИЦУ ТОВАРОВ ===
 	createTableProducts(db)
 
-	postgresRepo := repo.NewPostgres(db)
-	serv := service.NewService(postgresRepo)
+	productRepository := repo.NewProductRepository(db)
+	serv := service.NewProductService(productRepository)
 
 	// === НАСТРАИВАЕМ ВЕБ-СЕРВЕР ===
 	// Настройка HTTP-эндпоинта

@@ -2,15 +2,15 @@ package repo
 
 import "database/sql"
 
-type Postgres struct {
+type ProductRepository struct {
 	db *sql.DB
 }
 
-func NewPostgres(db *sql.DB) *Postgres {
-	return &Postgres{db: db}
+func NewProductRepository(db *sql.DB) *ProductRepository {
+	return &ProductRepository{db: db}
 }
 
-func (p *Postgres) DeleteProduct(id int) error {
+func (p *ProductRepository) DeleteProduct(id int) error {
 	_, err := p.db.Exec("DELETE FROM products WHERE id = $1", id)
 	return err
 }
