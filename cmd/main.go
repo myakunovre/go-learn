@@ -3,8 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"go-learn/repo"
-	"go-learn/service"
+	"go-learn/config"
+	"go-learn/internal/repo"
+	"go-learn/internal/service"
+	"go-learn/models"
 	"log"
 	"net/http"
 	"strconv"
@@ -15,11 +17,9 @@ import (
 
 func main() {
 	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
-	// Строка подключения к Postgres
-	connStr := "host=localhost port=5432 user=user password=password dbname=products_db sslmode=disable"
 
 	// Подключение к БД
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", config.Config.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
@@ -39,8 +39,9 @@ func main() {
 	productService := service.NewProductService(productRepository)
 
 	// === НАСТРАИВАЕМ GIN-ROUTER ===
-	// Rout for deleteProductHandler product
 	router := gin.Default()
+
+	// Rout for deleting product
 	router.DELETE("/product/delete", func(c *gin.Context) {
 		// Получаем ID из query параметра
 		idStr := c.Query("id")
@@ -66,6 +67,7 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
 			})
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -73,9 +75,75 @@ func main() {
 		})
 	})
 
+	// Rout for creating product
+	router.POST("/product/create", func(c *gin.Context) {
+		var req models.CreateProductRequest
+
+		// Привязываем JSON к структуре
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Invalid request: %v", err),
+			})
+			return
+		}
+
+		if req.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "product name can not be empty",
+			})
+			return
+		}
+
+		if req.Price <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "product price can not be less than zero",
+			})
+			return
+		}
+
+		id, err := productService.Create(req.Name, req.Price)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Product created successfully",
+			"id":      id,
+			"name":    req.Name,
+			"price":   req.Price,
+		})
+	})
+
+	router.GET("/product/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid id format",
+			})
+			return
+		}
+
+		product, err := productService.Get(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"product": product,
+		})
+	})
+
 	// Запуск http-сервиса
 	fmt.Println("🌐 Started to http://localhost:8080")
-	err = router.Run(":8080")
+	err = router.Run(":" + config.Config.ServerPort)
 	if err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
