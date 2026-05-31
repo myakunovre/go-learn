@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
-	_ "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq" // Драйвер для Postgres
 )
 
@@ -36,52 +36,46 @@ func main() {
 	createTableProducts(db)
 
 	productRepository := repo.NewProductRepository(db)
-	serv := service.NewProductService(productRepository)
+	productService := service.NewProductService(productRepository)
 
-	// === НАСТРАИВАЕМ ВЕБ-СЕРВЕР ===
-	// Настройка HTTP-эндпоинта
-	http.HandleFunc("/product/delete", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json") // ✅ Добавлен заголовок
-
-		// Проверка метода
-		if r.Method != http.MethodDelete {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			w.Write([]byte(`{"error":"Method not allowed, use DELETE"}`))
-			return
-		}
-
+	// === НАСТРАИВАЕМ GIN-ROUTER ===
+	// Rout for deleteProductHandler product
+	router := gin.Default()
+	router.DELETE("/product/delete", func(c *gin.Context) {
 		// Получаем ID из query параметра
-		idStr := r.URL.Query().Get("id")
+		idStr := c.Query("id")
 		if idStr == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"error":"id parameter is required"}`))
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "ID parameter is required",
+			})
 			return
 		}
 
-		// Конвертируем в число
+		// Конвертируем ID в число
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"error":"invalid id format"}`))
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "invalid id format",
+			})
 			return
 		}
 
-		// Удаляем
-		err = serv.Delete(id)
+		// Удаляем товар через сервис
+		err = productService.Delete(id)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf(`{"error":"%v"}`, err)))
-			return
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
 		}
 
-		w.WriteHeader(http.StatusOK)
-		fmt.Println("Product deleted")
-		w.Write([]byte("ok"))
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Product deleted successfully",
+		})
 	})
 
-	// Запуск HTTP-сервера
+	// Запуск http-сервиса
 	fmt.Println("🌐 Started to http://localhost:8080")
-	err = http.ListenAndServe(":8080", nil)
+	err = router.Run(":8080")
 	if err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}

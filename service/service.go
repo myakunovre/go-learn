@@ -1,18 +1,18 @@
 package service
 
-type DB interface {
+type ProductRepository interface {
 	DeleteProduct(int) error
 }
 
 type ProductService struct {
-	db DB
+	repo ProductRepository
 }
 
-func NewProductService(db DB) *ProductService {
-	return &ProductService{db: db}
+func NewProductService(repo ProductRepository) *ProductService {
+	return &ProductService{repo: repo}
 }
 
 func (s *ProductService) Delete(id int) error {
-	err := s.db.DeleteProduct(id)
+	err := s.repo.DeleteProduct(id)
 	return err
 }
