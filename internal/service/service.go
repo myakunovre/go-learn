@@ -9,6 +9,7 @@ type ProductRepository interface {
 	DeleteProduct(int) error
 	CreateProduct(name string, price float64) (int, error)
 	GetProduct(int) (*models.Product, error)
+	GetAllProducts() ([]models.Product, error)
 }
 
 type ProductService struct {
@@ -42,4 +43,12 @@ func (s *ProductService) Get(id int) (*models.Product, error) {
 		return nil, fmt.Errorf("product get failed: %w", err)
 	}
 	return product, nil
+}
+
+func (s *ProductService) GetAllProducts() ([]models.Product, error) {
+	products, err := s.repo.GetAllProducts()
+	if err != nil {
+		return nil, fmt.Errorf("product get failed: %w", err)
+	}
+	return products, nil
 }

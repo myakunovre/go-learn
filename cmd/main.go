@@ -3,23 +3,62 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"go-learn/config"
+	"go-learn/internal/handler"
 	"go-learn/internal/repo"
 	"go-learn/internal/service"
-	"go-learn/models"
 	"log"
-	"net/http"
-	"strconv"
+	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
 )
 
 func main() {
-	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("⚠️  .env файл не найден, использую системные переменные")
+	}
+
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+
+	dbPass := os.Getenv("DB_PASSWORD")
+	if dbPass == "" {
+		dbPass = "1234"
+	}
+
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "postgres"
+	}
+
+	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = "8080"
+	}
+
+	conStr := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPass, dbName,
+	)
+
+	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ ===
 	// Подключение к БД
-	db, err := sql.Open("postgres", config.Config.DatabaseURL)
+	db, err := sql.Open("postgres", conStr)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
@@ -37,113 +76,18 @@ func main() {
 
 	productRepository := repo.NewProductRepository(db)
 	productService := service.NewProductService(productRepository)
+	handlers := handler.NewHandler(productService)
 
-	// === НАСТРАИВАЕМ GIN-ROUTER ===
 	router := gin.Default()
 
-	// Rout for deleting product
-	router.DELETE("/product/delete", func(c *gin.Context) {
-		// Получаем ID из query параметра
-		idStr := c.Query("id")
-		if idStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "ID parameter is required",
-			})
-			return
-		}
-
-		// Конвертируем ID в число
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid id format",
-			})
-			return
-		}
-
-		// Удаляем товар через сервис
-		err = productService.Delete(id)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Product deleted successfully",
-		})
-	})
-
-	// Rout for creating product
-	router.POST("/product/create", func(c *gin.Context) {
-		var req models.CreateProductRequest
-
-		// Привязываем JSON к структуре
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("Invalid request: %v", err),
-			})
-			return
-		}
-
-		if req.Name == "" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "product name can not be empty",
-			})
-			return
-		}
-
-		if req.Price <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "product price can not be less than zero",
-			})
-			return
-		}
-
-		id, err := productService.Create(req.Name, req.Price)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Product created successfully",
-			"id":      id,
-			"name":    req.Name,
-			"price":   req.Price,
-		})
-	})
-
-	router.GET("/product/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
-
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid id format",
-			})
-			return
-		}
-
-		product, err := productService.Get(id)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"product": product,
-		})
-	})
+	router.DELETE("/product/delete", handlers.DeleteProductById)
+	router.POST("/product/create", handlers.CreateProduct)
+	router.GET("/product/:id", handlers.GetProductById)
+	router.GET("/products", handlers.GetAllProducts)
 
 	// Запуск http-сервиса
-	fmt.Println("🌐 Started to http://localhost:8080")
-	err = router.Run(":" + config.Config.ServerPort)
+	fmt.Println("🌐 Started to http://localhost:" + serverPort)
+	err = router.Run(":" + serverPort)
 	if err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
