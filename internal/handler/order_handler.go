@@ -2,6 +2,7 @@ package handler
 
 import (
 	"go-learn/internal/service"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -17,12 +18,14 @@ func NewOrderHandler(svc *service.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) BuyProduct(c *gin.Context) {
+	log.Printf("Called buy product with id=%s\n", c.Query("id"))
 	// Получаем ID из query параметра
 	idStr := c.Query("id")
 	if idStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID parameter is required",
 		})
+		log.Println("ID parameter is required")
 		return
 	}
 
@@ -32,6 +35,7 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id format",
 		})
+		log.Println("invalid id format")
 		return
 	}
 
@@ -41,6 +45,7 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
+		log.Printf("Error buy product with id=%d", id)
 		return
 	}
 
@@ -48,11 +53,13 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 }
 
 func (h *OrderHandler) GetCounts(c *gin.Context) {
+	log.Printf("Called get order counts for product with id=%s\n", c.Query("id"))
 	idStr := c.Query("id")
 	if idStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID parameter is required",
 		})
+		log.Println("ID parameter is required")
 		return
 	}
 
@@ -61,6 +68,7 @@ func (h *OrderHandler) GetCounts(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id format",
 		})
+		log.Println("invalid id format")
 		return
 	}
 
@@ -69,6 +77,7 @@ func (h *OrderHandler) GetCounts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
+		log.Printf("Error get order count for product with id=%d", id)
 		return
 	}
 

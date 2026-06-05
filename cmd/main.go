@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	_ "context"
 	"database/sql"
 	"fmt"
 	"go-learn/internal/handler"
@@ -15,14 +14,13 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
 	"github.com/redis/go-redis/v9"
-	_ "github.com/redis/go-redis/v9"
 )
 
 func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("⚠️  .env файл не найден, использую системные переменные")
+		log.Println("⚠️  .env файл не найден, использую системные переменные")
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
@@ -35,6 +33,7 @@ func main() {
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
+	log.Println("✅️ Кофигурация приложения выполнена")
 
 	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ POSTGRES ===
 	conStr := fmt.Sprintf(
@@ -52,7 +51,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Не удалось подключиться к Postgres: %v", err)
 	}
-	fmt.Println("✅ Успешно подключено к Postgres!")
+	log.Println("✅ Успешно подключено к Postgres!")
 
 	// === ПОДКЛЮЧЕНИЕ К REDIS===
 	redisClient := redis.NewClient(&redis.Options{
@@ -67,7 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Не удалось подключиться к Redis: %v", err)
 	}
-	fmt.Println("✅ Успешно подключено к Redis!")
+	log.Println("✅ Успешно подключено к Redis!")
 
 	// === СОЗДАЕМ ТАБЛИЦУ ТОВАРОВ ===
 	createTableProducts(db)
@@ -115,7 +114,7 @@ func createTableProducts(db *sql.DB) {
 		log.Fatalf("Ошибка создания таблицы: %v", err)
 	}
 
-	fmt.Println("✅ Таблица 'products' проверена/создана успешно.")
+	log.Println("✅ Таблица 'products' проверена/создана успешно.")
 }
 
 func getEnv(key, defaultValue string) string {
