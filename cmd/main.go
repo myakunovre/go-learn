@@ -7,7 +7,6 @@ import (
 	"go-learn/internal/handler"
 	"go-learn/internal/repo"
 	"go-learn/internal/service"
-	"log"
 	"log/slog"
 	"os"
 
@@ -40,7 +39,7 @@ func main() {
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
-	log.Println("✅️ Кофигурация приложения выполнена")
+	logger.Info("✅️ Кофигурация приложения выполнена")
 
 	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ POSTGRES ===
 	conStr := fmt.Sprintf(
