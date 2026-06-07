@@ -2,7 +2,6 @@ package handler
 
 import (
 	"go-learn/internal/service"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -48,7 +47,6 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
-		log.Printf("Error buy product with id=%d", id)
 		h.logger.Error("Error Buy Product", "id", id, "error", err)
 		return
 	}

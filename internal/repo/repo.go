@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"go-learn/models"
-	"log"
 	"log/slog"
 )
 
@@ -79,7 +78,6 @@ func (r *ProductRepository) GetProduct(id int) (*models.Product, error) {
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	log.Printf("[ProductRepository] Successfully got product with ID=%d", id)
 	r.logger.Info("[ProductRepository] Product found successfully", "id", id, "name", product.Name)
 	return &product, nil
 }
