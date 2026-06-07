@@ -8,8 +8,10 @@ import (
 	"go-learn/internal/repo"
 	"go-learn/internal/service"
 	"log"
+	"log/slog"
 	"os"
 
+	"github.com/bytedance/gopkg/util/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
@@ -18,9 +20,14 @@ import (
 
 func main() {
 
+	// === СОЗДАЕМ ЛОГГЕР ===
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("⚠️  .env файл не найден, использую системные переменные")
+		logger.Warn("⚠️  .env файл не найден, использую системные переменные")
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
@@ -43,15 +50,17 @@ func main() {
 
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
-		log.Fatalf("Ошибка подключения к базе данных: %v", err)
+		logger.Error("Ошибка подключения к базе данных", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close() // Закроем соединение когда программа завершится
 
 	err = db.Ping()
 	if err != nil {
-		log.Fatalf("Не удалось подключиться к Postgres: %v", err)
+		logger.Error("Не удалось подключиться к Postgres", "error", err)
+		os.Exit(1)
 	}
-	log.Println("✅ Успешно подключено к Postgres!")
+	logger.Info("✅ Успешно подключено к Postgres!")
 
 	// === ПОДКЛЮЧЕНИЕ К REDIS===
 	redisClient := redis.NewClient(&redis.Options{
@@ -64,40 +73,42 @@ func main() {
 	ctx := context.Background()
 	err = redisClient.Ping(ctx).Err()
 	if err != nil {
-		log.Fatalf("Не удалось подключиться к Redis: %v", err)
+		logger.Error("Не удалось подключиться к Redis", "error", err)
+		os.Exit(1)
 	}
-	log.Println("✅ Успешно подключено к Redis!")
+	logger.Info("✅ Успешно подключено к Redis!")
 
 	// === СОЗДАЕМ ТАБЛИЦУ ТОВАРОВ ===
 	createTableProducts(db)
 
 	// === ИНИЦИАЛИЗАЦИЯ СЛОЕВ ===
-	productRepository := repo.NewProductRepository(db)
-	productService := service.NewProductService(productRepository)
-	productHandler := handler.NewHandler(productService)
+	productRepository := repo.NewProductRepository(db, logger)
+	productService := service.NewProductService(productRepository, logger)
+	productHandler := handler.NewHandler(productService, logger)
 
-	orderRepository := repo.NewOrderRepository(redisClient)
-	orderService := service.NewOrderService(orderRepository)
-	orderHandler := handler.NewOrderHandler(orderService)
+	orderRepository := repo.NewOrderRepository(redisClient, logger)
+	orderService := service.NewOrderService(orderRepository, logger)
+	orderHandler := handler.NewOrderHandler(orderService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
 
 	// Эндпоинты товаров
-	router.DELETE("/product/delete", productHandler.DeleteProductById)
+	router.DELETE("/product/delete/:id", productHandler.DeleteProductById)
 	router.POST("/product/create", productHandler.CreateProduct)
 	router.GET("/product/:id", productHandler.GetProductById)
 	router.GET("/products", productHandler.GetAllProducts)
 
 	// Эндпоинты продуктов
-	router.POST("/buy/product", orderHandler.BuyProduct)
-	router.GET("/product/orders", orderHandler.GetCounts)
+	router.POST("/buy/product/:id", orderHandler.BuyProduct)
+	router.GET("/product/:id/orders", orderHandler.GetCounts)
 
 	// Запуск http-сервиса
 	fmt.Println("🌐 Started to http://localhost:" + serverPort)
 	err = router.Run(":" + serverPort)
 	if err != nil {
-		log.Fatalf("Ошибка запуска сервера: %v", err)
+		logger.Error("Ошибка создания таблицы", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -111,10 +122,11 @@ func createTableProducts(db *sql.DB) {
 
 	_, err := db.Exec(query)
 	if err != nil {
-		log.Fatalf("Ошибка создания таблицы: %v", err)
+		logger.Error("Ошибка создания таблицы", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("✅ Таблица 'products' проверена/создана успешно.")
+	logger.Info("✅ Таблица 'products' проверена/создана успешно.")
 }
 
 func getEnv(key, defaultValue string) string {

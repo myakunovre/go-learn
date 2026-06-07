@@ -2,32 +2,41 @@ package handler
 
 import (
 	"fmt"
-	"go-learn/internal/service"
-	"log"
+	"go-learn/models"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	svc *service.ProductService
+type ProductServiceInterface interface {
+	Delete(id int) error
+	Create(name string, price float64) (int, error)
+	Get(id int) (*models.Product, error)
+	GetAllProducts() ([]models.Product, error)
 }
 
-func NewHandler(svc *service.ProductService) *Handler {
-	return &Handler{svc: svc}
+type Handler struct {
+	//svc *service.ProductService
+	svc    ProductServiceInterface
+	logger *slog.Logger
+}
+
+func NewHandler(svc ProductServiceInterface, logger *slog.Logger) *Handler {
+	return &Handler{svc: svc, logger: logger}
 }
 
 func (h *Handler) DeleteProductById(c *gin.Context) {
-	log.Printf("Called DeleteProductById with id=%d", c.Param("id"))
+	h.logger.Info("Called DeleteProductById with id=%d", c.Param("id"))
 
-	// Получаем ID из query параметра
-	idStr := c.Query("id")
+	// Получаем ID из URL‑пути
+	idStr := c.Param("id")
 	if idStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "ID parameter is required",
 		})
-		log.Println("ID parameter is required")
+		h.logger.Warn("ID parameter is required")
 		return
 	}
 
@@ -37,7 +46,7 @@ func (h *Handler) DeleteProductById(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id format",
 		})
-		log.Println("invalid id format")
+		h.logger.Warn("invalid id format")
 		return
 	}
 
@@ -47,18 +56,18 @@ func (h *Handler) DeleteProductById(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
-		log.Printf("Error Deleting Product with ID=%d: %v", id, err)
+		h.logger.Error("Error Deleting Product", "id", id, "error", err)
 		return
 	}
 
-	log.Println("Delete Product Success")
+	h.logger.Info("Delete Product Success", "id", id)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Product deleted successfully",
 	})
 }
 
 func (h *Handler) CreateProduct(c *gin.Context) {
-	log.Println("Called CreateProduct")
+	h.logger.Info("Called CreateProduct")
 
 	var req CreateProductRequest
 
@@ -67,7 +76,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprintf("Invalid request: %v", err),
 		})
-		log.Println("Invalid request")
+		h.logger.Warn("Invalid request", "error", err)
 		return
 	}
 
@@ -75,7 +84,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "product name can not be empty",
 		})
-		log.Println("product name can not be empty")
+		h.logger.Warn("product name can not be empty")
 		return
 	}
 
@@ -83,7 +92,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "product price can not be less than zero",
 		})
-		log.Println("product price can not be less than zero")
+		h.logger.Warn("product price can not be less than zero")
 		return
 	}
 
@@ -92,11 +101,11 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
-		log.Printf("Error Create Product with id=%d: %v", id, err)
+		h.logger.Error("Error Create Product", "name", req.Name, "price", req.Price, "error", err)
 		return
 	}
 
-	log.Printf("Product named \"%s\" with price %f was created with id=%d", req.Name, req.Price, id)
+	h.logger.Info("Product created successfully", "id", id, "name", req.Name, "price", req.Price)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Product created successfully",
 		"id":      id,
@@ -106,16 +115,25 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 }
 
 func (h *Handler) GetProductById(c *gin.Context) {
-	log.Printf("Called GetProductById with id=%d", c.Param("id"))
+	h.logger.Info("Called GetProductById", "id", c.Param("id"))
 
+	// Получаем ID из URL‑пути
 	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+	if idStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID parameter is required",
+		})
+		h.logger.Warn("ID parameter is required")
+		return
+	}
 
+	// Конвертируем ID в число
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid id format",
 		})
-		log.Println("invalid id format")
+		h.logger.Warn("invalid id format")
 		return
 	}
 
@@ -124,28 +142,31 @@ func (h *Handler) GetProductById(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
-		log.Printf("Error of Get Product with id=%d: %v", id, err)
+		h.logger.Error("Error Get Product", "id", id, "error", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"product": product,
 	})
-	log.Printf("Product named \"%s\" with id=%d called successful", product.Name, id)
+
+	h.logger.Info("Product found successfully", "name", product.Name, "id", id)
 }
 
 func (h *Handler) GetAllProducts(c *gin.Context) {
+	h.logger.Info("Called GetAllProducts")
+
 	products, err := h.svc.GetAllProducts()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
-		log.Println("GetAll Products Error")
+		h.logger.Error("Error Get All Products", "error", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"products": products,
 	})
-	log.Println("GetAll Products Success")
+	h.logger.Info("Products found successfully", "products", len(products))
 }

@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 type OrderRepository interface {
@@ -12,31 +12,32 @@ type OrderRepository interface {
 }
 
 type OrderService struct {
-	repo OrderRepository
+	repo   OrderRepository
+	logger *slog.Logger
 }
 
-func NewOrderService(repo OrderRepository) *OrderService {
-	return &OrderService{repo: repo}
+func NewOrderService(repo OrderRepository, logger *slog.Logger) *OrderService {
+	return &OrderService{repo: repo, logger: logger}
 }
 
-func (service *OrderService) BuyProduct(ctx context.Context, productID int) (int64, error) {
-	totalOrders, err := service.repo.IncrementOrder(ctx, productID)
+func (s *OrderService) BuyProduct(ctx context.Context, productID int) (int64, error) {
+	totalOrders, err := s.repo.IncrementOrder(ctx, productID)
 	if err != nil {
-		log.Printf("[OrderService] Error increment order for product with id=%d: %v", productID, err)
+		s.logger.Error("[OrderService] Error increment order for product", "id", productID, "err", err)
 		return 0, fmt.Errorf("failed to increment order: %w", err)
 	}
 
-	log.Printf("[OrderService] Success increment order for product with id=%d", productID)
+	s.logger.Info("[OrderService] Success increment order for product", "id", productID)
 	return totalOrders, nil
 }
 
-func (service *OrderService) GetOrderCount(ctx context.Context, productID int) (int64, error) {
-	count, err := service.repo.GetOrder(ctx, productID)
+func (s *OrderService) GetOrderCount(ctx context.Context, productID int) (int64, error) {
+	count, err := s.repo.GetOrder(ctx, productID)
 	if err != nil {
-		log.Printf("[OrderService] Error get order count for product with id=%d: %v", productID, err)
+		s.logger.Error("[OrderService] Error get order count", "id", productID, "err", err)
 		return 0, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	log.Printf("[OrderService] Success get order count for product with id=%d", productID)
+	s.logger.Info("[OrderService] Success get order count", "id", productID)
 	return count, nil
 }
