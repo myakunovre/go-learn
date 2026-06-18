@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -21,6 +22,11 @@ func NewOrderService(repo OrderRepository, logger *slog.Logger) *OrderService {
 }
 
 func (s *OrderService) BuyProduct(ctx context.Context, productID int) (int64, error) {
+	if productID <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return 0, errors.New("product id should be greater than zero")
+	}
+
 	totalOrders, err := s.repo.IncrementOrder(ctx, productID)
 	if err != nil {
 		s.logger.Error("[OrderService] Error increment order for product", "id", productID, "err", err)
@@ -32,6 +38,11 @@ func (s *OrderService) BuyProduct(ctx context.Context, productID int) (int64, er
 }
 
 func (s *OrderService) GetOrderCount(ctx context.Context, productID int) (int64, error) {
+	if productID <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return 0, errors.New("product id should be greater than zero")
+	}
+
 	count, err := s.repo.GetOrder(ctx, productID)
 	if err != nil {
 		s.logger.Error("[OrderService] Error get order count", "id", productID, "err", err)

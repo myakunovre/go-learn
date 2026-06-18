@@ -1,25 +1,23 @@
 package handler
 
 import (
-	"go-learn/internal/service"
-	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type OrderHandler struct {
-	svc    *service.OrderService
-	logger *slog.Logger
-}
+//type OrderHandler struct {
+//	productService    *service.OrderService
+//	logger *slog.Logger
+//}
+//
+//func NewOrderHandler(productService *service.OrderService, logger *slog.Logger) *OrderHandler {
+//	return &OrderHandler{productService: productService, logger: logger}
+//}
 
-func NewOrderHandler(svc *service.OrderService, logger *slog.Logger) *OrderHandler {
-	return &OrderHandler{svc: svc, logger: logger}
-}
-
-func (h *OrderHandler) BuyProduct(c *gin.Context) {
-	h.logger.Info("[OrderHandler] Buying product", "productId", c.Param("id"))
+func (h *Handler) BuyProduct(c *gin.Context) {
+	h.logger.Debug("[OrderHandler] Buying product", "productId", c.Param("id"))
 
 	// Получаем ID из URL‑пути
 	idStr := c.Param("id")
@@ -42,7 +40,7 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 	}
 
 	// Записываем заказ в редис
-	_, err = h.svc.BuyProduct(c.Request.Context(), id)
+	_, err = h.orderService.BuyProduct(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -55,8 +53,8 @@ func (h *OrderHandler) BuyProduct(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (h *OrderHandler) GetCounts(c *gin.Context) {
-	h.logger.Info("Called get order counts for product", "id", c.Param("id"))
+func (h *Handler) GetCounts(c *gin.Context) {
+	h.logger.Debug("Called get order counts for product", "id", c.Param("id"))
 
 	// Получаем ID из URL‑пути
 	idStr := c.Param("id")
@@ -79,7 +77,7 @@ func (h *OrderHandler) GetCounts(c *gin.Context) {
 		return
 	}
 
-	orderCounts, err := h.svc.GetOrderCount(c.Request.Context(), id)
+	orderCounts, err := h.orderService.GetOrderCount(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"go-learn/models"
 	"log/slog"
@@ -8,7 +9,7 @@ import (
 
 type ProductRepository interface {
 	DeleteProduct(int) error
-	CreateProduct(name string, price float64) (int, error)
+	CreateProduct(name string, price int) (int, error)
 	GetProduct(int) (*models.Product, error)
 	GetAllProducts() ([]models.Product, error)
 }
@@ -26,6 +27,11 @@ func NewProductService(repo ProductRepository, logger *slog.Logger) *ProductServ
 }
 
 func (s *ProductService) Delete(id int) error {
+	if id <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return errors.New("product id should be greater than zero")
+	}
+
 	err := s.repo.DeleteProduct(id)
 	if err != nil {
 		s.logger.Error("[ProductService] Error of deleting product", "id", id, "error", err)
@@ -36,7 +42,17 @@ func (s *ProductService) Delete(id int) error {
 	return nil
 }
 
-func (s *ProductService) Create(name string, price float64) (int, error) {
+func (s *ProductService) Create(name string, price int) (int, error) {
+	if price <= 0 {
+		s.logger.Error("[ProductService] Price less than zero", "price", price)
+		return 0, errors.New("price less than zero")
+	}
+
+	if len(name) == 0 {
+		s.logger.Error("[ProductService] Price less than zero", "price", price)
+		return 0, errors.New("length of name is zero")
+	}
+
 	id, err := s.repo.CreateProduct(name, price)
 	if err != nil {
 		s.logger.Error("[ProductService] Error of creating product", "id", id, "error", err)
@@ -48,6 +64,11 @@ func (s *ProductService) Create(name string, price float64) (int, error) {
 }
 
 func (s *ProductService) Get(id int) (*models.Product, error) {
+	if id <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return nil, errors.New("product id should be greater than zero")
+	}
+
 	product, err := s.repo.GetProduct(id)
 	if err != nil {
 		s.logger.Error("[ProductService] Error of getting product", "id", id, "error", err)

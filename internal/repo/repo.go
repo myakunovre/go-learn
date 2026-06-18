@@ -20,7 +20,7 @@ func NewProductRepository(db *sql.DB, logger *slog.Logger) *ProductRepository {
 }
 
 func (r *ProductRepository) DeleteProduct(id int) error {
-	r.logger.Info("[ProductRepository] Deleting product]", "id", id)
+	r.logger.Debug("[ProductRepository] Deleting product]", "id", id)
 
 	result, err := r.db.Exec("DELETE FROM products WHERE id = $1", id)
 	if err != nil {
@@ -43,8 +43,8 @@ func (r *ProductRepository) DeleteProduct(id int) error {
 	return nil
 }
 
-func (r *ProductRepository) CreateProduct(name string, price float64) (int, error) {
-	r.logger.Info("[ProductRepository] Creating product", "name", name, "price", price)
+func (r *ProductRepository) CreateProduct(name string, price int) (int, error) {
+	r.logger.Debug("[ProductRepository] Creating product", "name", name, "price", price)
 
 	var id int
 	err := r.db.QueryRow(
@@ -61,7 +61,7 @@ func (r *ProductRepository) CreateProduct(name string, price float64) (int, erro
 }
 
 func (r *ProductRepository) GetProduct(id int) (*models.Product, error) {
-	r.logger.Info("[ProductRepository] Getting product", "id", id)
+	r.logger.Debug("[ProductRepository] Getting product", "id", id)
 
 	var product models.Product
 	err := r.db.QueryRow(
@@ -83,7 +83,7 @@ func (r *ProductRepository) GetProduct(id int) (*models.Product, error) {
 }
 
 func (r *ProductRepository) GetAllProducts() ([]models.Product, error) {
-	r.logger.Info("[ProductRepository] Getting all products")
+	r.logger.Debug("[ProductRepository] Getting all products")
 
 	rows, err := r.db.Query("SELECT id, name, price FROM products")
 	if err != nil {

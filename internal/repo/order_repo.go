@@ -21,7 +21,7 @@ func NewOrderRepository(client *redis.Client, logger *slog.Logger) *OrderReposit
 }
 
 func (r *OrderRepository) IncrementOrder(ctx context.Context, productID int) (int64, error) {
-	r.logger.Info("[OrderRepository] Incrementing order", "productID", productID)
+	r.logger.Debug("[OrderRepository] Incrementing order", "productID", productID)
 
 	key := fmt.Sprintf("product_id: %d", productID)
 	newValue, err := r.client.Incr(ctx, key).Result()
@@ -41,7 +41,7 @@ func (r *OrderRepository) IncrementOrder(ctx context.Context, productID int) (in
 }
 
 func (r *OrderRepository) GetOrder(ctx context.Context, productID int) (int64, error) {
-	r.logger.Info("[OrderRepository] Get order count", "productID", productID)
+	r.logger.Debug("[OrderRepository] Get order count", "productID", productID)
 
 	key := fmt.Sprintf("product_id: %d", productID)
 	value, err := r.client.Get(ctx, key).Result()

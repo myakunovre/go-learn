@@ -81,26 +81,26 @@ func main() {
 	createTableProducts(db)
 
 	// === ИНИЦИАЛИЗАЦИЯ СЛОЕВ ===
-	productRepository := repo.NewProductRepository(db, logger)
-	productService := service.NewProductService(productRepository, logger)
-	productHandler := handler.NewHandler(productService, logger)
+	orderRepo := repo.NewOrderRepository(redisClient, logger)
+	productRepo := repo.NewProductRepository(db, logger)
 
-	orderRepository := repo.NewOrderRepository(redisClient, logger)
-	orderService := service.NewOrderService(orderRepository, logger)
-	orderHandler := handler.NewOrderHandler(orderService, logger)
+	orderService := service.NewOrderService(orderRepo, logger)
+	productService := service.NewProductService(productRepo, logger)
+
+	h := handler.NewHandler(productService, orderService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
 
 	// Эндпоинты товаров
-	router.DELETE("/product/delete/:id", productHandler.DeleteProductById)
-	router.POST("/product/create", productHandler.CreateProduct)
-	router.GET("/product/:id", productHandler.GetProductById)
-	router.GET("/products", productHandler.GetAllProducts)
+	router.DELETE("/product/delete/:id", h.DeleteProductById)
+	router.POST("/product/create", h.CreateProduct)
+	router.GET("/product/:id", h.GetProductById)
+	router.GET("/products", h.GetAllProducts)
 
 	// Эндпоинты продуктов
-	router.POST("/buy/product/:id", orderHandler.BuyProduct)
-	router.GET("/product/:id/orders", orderHandler.GetCounts)
+	router.POST("/buy/product/:id", h.BuyProduct)
+	router.GET("/product/:id/orders", h.GetCounts)
 
 	// Запуск http-сервиса
 	fmt.Println("🌐 Started to http://localhost:" + serverPort)
