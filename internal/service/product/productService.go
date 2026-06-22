@@ -1,4 +1,4 @@
-package service
+package product
 
 import (
 	"errors"
@@ -26,22 +26,6 @@ func NewProductService(repo ProductRepository, logger *slog.Logger) *ProductServ
 	}
 }
 
-func (s *ProductService) Delete(id int) error {
-	if id <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return errors.New("product id should be greater than zero")
-	}
-
-	err := s.repo.DeleteProduct(id)
-	if err != nil {
-		s.logger.Error("[ProductService] Error of deleting product", "id", id, "error", err)
-		return fmt.Errorf("failed to delete product with id %d: %v", id, err)
-	}
-
-	s.logger.Info("[ProductService] ✅ Product deleted successfully", "id", id)
-	return nil
-}
-
 func (s *ProductService) Create(name string, price int) (int, error) {
 	if price <= 0 {
 		s.logger.Error("[ProductService] Price less than zero", "price", price)
@@ -55,11 +39,11 @@ func (s *ProductService) Create(name string, price int) (int, error) {
 
 	id, err := s.repo.CreateProduct(name, price)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of creating product", "id", id, "error", err)
+		s.logger.Error("[ProductService] Error of creating product", "name", name, "error", err)
 		return 0, fmt.Errorf("product creation failed: %w", err)
 	}
 
-	s.logger.Info("[ProductService] ✅ Product created successful", "id", id, "name", name, "price", price)
+	s.logger.Info("[ProductService] ✅ Product created successfully", "id", id, "name", name, "price", price)
 	return id, nil
 }
 
@@ -88,4 +72,20 @@ func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 
 	s.logger.Info("[ProductService] All Products got successful", "num", len(products))
 	return products, nil
+}
+
+func (s *ProductService) Delete(id int) error {
+	if id <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return errors.New("product id should be greater than zero")
+	}
+
+	err := s.repo.DeleteProduct(id)
+	if err != nil {
+		s.logger.Error("[ProductService] Error of deleting product", "id", id, "error", err)
+		return fmt.Errorf("failed to delete product with id %d: %v", id, err)
+	}
+
+	s.logger.Info("[ProductService] ✅ Product deleted successfully", "id", id)
+	return nil
 }

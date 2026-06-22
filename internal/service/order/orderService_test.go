@@ -1,17 +1,18 @@
-package service
+package order
 
 import (
 	"context"
 	"go-learn/internal/service/mocks"
 	"log/slog"
+	"os"
 	"testing"
 
 	"go.uber.org/mock/gomock"
 )
 
-//var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-//	Level: slog.LevelDebug,
-//}))
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	Level: slog.LevelDebug,
+}))
 
 func TestOrderService_BuyProduct(t *testing.T) {
 	ctrl := gomock.NewController(t)

@@ -1,4 +1,4 @@
-package service
+package product
 
 import (
 	"go-learn/internal/service/mocks"
@@ -241,7 +241,7 @@ func TestProductService_Get(t *testing.T) {
 	mockProductRepo.EXPECT().GetProduct(gomock.Any()).AnyTimes().Return(&models.Product{}, nil)
 
 	type fields struct {
-		repo   ProductRepository
+		repo   *mocks.MockProductRepository
 		logger *slog.Logger
 	}
 	type args struct {
@@ -340,7 +340,7 @@ func TestProductService_GetAllProducts(t *testing.T) {
 	mockProductRepo.EXPECT().GetAllProducts().AnyTimes().Return([]models.Product{}, nil)
 
 	type fields struct {
-		repo   ProductRepository
+		repo   *mocks.MockProductRepository
 		logger *slog.Logger
 	}
 	tests := []struct {

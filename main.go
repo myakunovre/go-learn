@@ -3,19 +3,34 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"go-learn/internal/handler"
-	"go-learn/internal/repo"
-	"go-learn/internal/service"
+	"go-learn/internal/middleware"
+	"io/fs"
+
+	authrepo "go-learn/internal/repo/auth"
+	orderepo "go-learn/internal/repo/order"
+	productrepo "go-learn/internal/repo/product"
+	userrepo "go-learn/internal/repo/user"
+
+	authservice "go-learn/internal/service/auth"
+	orderservice "go-learn/internal/service/order"
+	productservice "go-learn/internal/service/product"
+	userservice "go-learn/internal/service/user"
+
 	"log/slog"
 	"os"
 
-	"github.com/bytedance/gopkg/util/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
+	"github.com/pressly/goose/v3"
 	"github.com/redis/go-redis/v9"
 )
+
+//go:embed migrations/*.sql
+var embedMigrations embed.FS
 
 func main() {
 
@@ -30,8 +45,8 @@ func main() {
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPass := getEnv("DB_PASSWORD", "1234")
+	dbUser := getEnv("DB_USER", "user")
+	dbPass := getEnv("DB_PASSWORD", "password")
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbName := getEnv("DB_NAME", "postgres")
@@ -67,6 +82,11 @@ func main() {
 		Password: redisPassword,
 		DB:       0,
 	})
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Error("Ошибка при закрытии Redis", "error", err)
+		}
+	}()
 
 	// Проверка соединения с Redis
 	ctx := context.Background()
@@ -77,30 +97,53 @@ func main() {
 	}
 	logger.Info("✅ Успешно подключено к Redis!")
 
-	// === СОЗДАЕМ ТАБЛИЦУ ТОВАРОВ ===
-	createTableProducts(db)
+	// === НАКАТЫВАЕМ МИГРАЦИЮ
+	migrationsFS, err := fs.Sub(embedMigrations, "migrations")
+	if err != nil {
+		logger.Error("Ошибка извлечения миграций", "error", err)
+		os.Exit(1)
+	}
+
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.Up(db, "."); err != nil {
+		logger.Error("Ошибка миграции", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("✅ Миграции успешно применены")
 
 	// === ИНИЦИАЛИЗАЦИЯ СЛОЕВ ===
-	orderRepo := repo.NewOrderRepository(redisClient, logger)
-	productRepo := repo.NewProductRepository(db, logger)
+	orderRepo := orderepo.NewOrderRepository(redisClient, logger)
+	productRepo := productrepo.NewProductRepository(db, logger)
+	userRepo := userrepo.NewUserRepository(db, logger)
+	authRepo := authrepo.NewAuthRepository(db, logger)
+	sessionCache := authrepo.NewSessionCache(redisClient)
 
-	orderService := service.NewOrderService(orderRepo, logger)
-	productService := service.NewProductService(productRepo, logger)
+	orderService := orderservice.NewOrderService(orderRepo, logger)
+	productService := productservice.NewProductService(productRepo, logger)
+	userService := userservice.NewUserService(userRepo, logger)
+	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
-	h := handler.NewHandler(productService, orderService, logger)
+	h := handler.NewHandler(productService, orderService, userService, authService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
 
-	// Эндпоинты товаров
-	router.DELETE("/product/delete/:id", h.DeleteProductById)
-	router.POST("/product/create", h.CreateProduct)
+	// Публичные эндпоинты
+	router.POST("/user/create", h.CreateUser)
+	router.POST("/login", h.Login)
 	router.GET("/product/:id", h.GetProductById)
 	router.GET("/products", h.GetAllProducts)
 
-	// Эндпоинты продуктов
-	router.POST("/buy/product/:id", h.BuyProduct)
-	router.GET("/product/:id/orders", h.GetCounts)
+	// Защищенные эндпоинты (требуют авторизацию)
+	auth := router.Group("/")
+	auth.Use(middleware.AuthMiddleware(authService))
+	{
+		auth.POST("/logout", h.Logout)
+		auth.DELETE("/product/delete/:id", h.DeleteProductById)
+		auth.POST("/product/create", h.CreateProduct)
+		auth.POST("/buy/product/:id", h.BuyProduct)
+		auth.GET("/product/:id/orders", h.GetCounts)
+	}
 
 	// Запуск http-сервиса
 	fmt.Println("🌐 Started to http://localhost:" + serverPort)
@@ -109,23 +152,6 @@ func main() {
 		logger.Error("Ошибка создания таблицы", "error", err)
 		os.Exit(1)
 	}
-}
-
-func createTableProducts(db *sql.DB) {
-	query := `
-	CREATE TABLE IF NOT EXISTS products (
-		id SERIAL PRIMARY KEY,
-		name VARCHAR(100) NOT NULL,
-		price NUMERIC(10, 2) NOT NULL
-	);`
-
-	_, err := db.Exec(query)
-	if err != nil {
-		logger.Error("Ошибка создания таблицы", "error", err)
-		os.Exit(1)
-	}
-
-	logger.Info("✅ Таблица 'products' проверена/создана успешно.")
 }
 
 func getEnv(key, defaultValue string) string {

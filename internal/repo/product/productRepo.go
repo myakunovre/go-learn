@@ -1,4 +1,4 @@
-package repo
+package product
 
 import (
 	"database/sql"
@@ -17,30 +17,6 @@ func NewProductRepository(db *sql.DB, logger *slog.Logger) *ProductRepository {
 		db:     db,
 		logger: logger,
 	}
-}
-
-func (r *ProductRepository) DeleteProduct(id int) error {
-	r.logger.Debug("[ProductRepository] Deleting product]", "id", id)
-
-	result, err := r.db.Exec("DELETE FROM products WHERE id = $1", id)
-	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
-		return fmt.Errorf("failed to delete product: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
-		return fmt.Errorf("failed to check rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		r.logger.Warn("[ProductRepository] No product found to delete", "id", id)
-		return fmt.Errorf("no product found with id %d", id)
-	}
-
-	r.logger.Info("[ProductRepository] Product deleted successfully", "id", id)
-	return nil
 }
 
 func (r *ProductRepository) CreateProduct(name string, price int) (int, error) {
@@ -109,4 +85,28 @@ func (r *ProductRepository) GetAllProducts() ([]models.Product, error) {
 
 	r.logger.Info("[ProductRepository] Products found successfully", "count", len(products))
 	return products, nil
+}
+
+func (r *ProductRepository) DeleteProduct(id int) error {
+	r.logger.Debug("[ProductRepository] Deleting product]", "id", id)
+
+	result, err := r.db.Exec("DELETE FROM products WHERE id = $1", id)
+	if err != nil {
+		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
+		return fmt.Errorf("failed to delete product: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		r.logger.Warn("[ProductRepository] No product found to delete", "id", id)
+		return fmt.Errorf("no product found with id %d", id)
+	}
+
+	r.logger.Info("[ProductRepository] Product deleted successfully", "id", id)
+	return nil
 }

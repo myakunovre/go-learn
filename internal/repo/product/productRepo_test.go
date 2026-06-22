@@ -1,4 +1,4 @@
-package repo
+package product
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/gopkg/util/logger"
 	_ "github.com/lib/pq"
 	_ "github.com/stretchr/testify/assert"
 	_ "github.com/stretchr/testify/require"
@@ -19,18 +20,18 @@ import (
 
 // Глобальные переменные для тестовой инфраструктуры
 var (
-	testDB            *sql.DB
-	postgresContainer testcontainers.Container
+	testProductDB            *sql.DB
+	postgresProductContainer testcontainers.Container
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+var productLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 	Level: slog.LevelDebug,
 }))
 
 // TestMain - точка входа для всех тестов в пакете
 func TestMain(m *testing.M) {
 	// Настройка тестового окружения
-	code, err := setupTestDatabase()
+	code, err := setupTestProductDatabase()
 	if err != nil {
 		fmt.Printf("❌ Ошибка при настройке тестовой БД: %v\n", err)
 		os.Exit(1)
@@ -43,13 +44,13 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Очистка ресурсов
-	teardownTestDatabase()
+	teardownProductTestDatabase()
 
 	os.Exit(exitCode)
 }
 
 // Создаем тестовый контейнер PostgreSQL
-func setupTestDatabase() (int, error) {
+func setupTestProductDatabase() (int, error) {
 	logger.Debug("🚀 Запуск тестового контейнера PostgreSQL...")
 
 	ctx := context.Background()
@@ -71,7 +72,7 @@ func setupTestDatabase() (int, error) {
 
 	// Запускаем контейнер
 	var err error
-	postgresContainer, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	postgresProductContainer, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
@@ -81,13 +82,13 @@ func setupTestDatabase() (int, error) {
 	}
 
 	// Получаем хост и порт
-	host, err := postgresContainer.Host(ctx)
+	host, err := postgresProductContainer.Host(ctx)
 	if err != nil {
 		logger.Error("❌ Ошибка получения хоста", "error", err)
 		return 1, err
 	}
 
-	port, err := postgresContainer.MappedPort(ctx, "5432")
+	port, err := postgresProductContainer.MappedPort(ctx, "5432")
 	if err != nil {
 		logger.Error("❌ Ошибка получения порта", "error", err)
 		return 1, err
@@ -98,9 +99,9 @@ func setupTestDatabase() (int, error) {
 		host, port.Port())
 
 	// Подключаемся к БД с повторными попытками
-	testDB, err = connectWithRetries(dns, 10, 2*time.Second)
+	testProductDB, err = connectWithRetriesProducts(dns, 10, 2*time.Second)
 	if err != nil {
-		logger.Error("Ошибка подключения к тестовой БД", "error", err)
+		logger.Error("Ошибка подключения к тестовой БД products", "error", err)
 		return 1, err
 	}
 
@@ -109,13 +110,13 @@ func setupTestDatabase() (int, error) {
 		CREATE TABLE IF NOT EXISTS products (
     		id SERIAL PRIMARY KEY,
     		name VARCHAR(255) NOT NULL,
-    		price INTEGER NOT NULL
-		)
+    		price INTEGER NOT NULL CHECK (price > 0)
+		);
 	`
 
-	_, err = testDB.Exec(query)
+	_, err = testProductDB.Exec(query)
 	if err != nil {
-		logger.Error("Ошибка создания таблицы", "error", err)
+		logger.Error("Ошибка создания таблицы products", "error", err)
 		return 1, err
 	}
 
@@ -124,35 +125,38 @@ func setupTestDatabase() (int, error) {
 }
 
 // teardownTestDatabase очищает ресурсы после тестов
-func teardownTestDatabase() {
+func teardownProductTestDatabase() {
 	fmt.Printf("🧹 Очистка тестовых ресурсов...")
 
-	if testDB != nil {
+	if testProductDB != nil {
 		// Очищаем данные перед закрытием
-		_, _ = testDB.Exec("DROP TABLE products;")
+		_, err := testProductDB.Exec("TRUNCATE TABLE products RESTART IDENTITY CASCADE")
+		if err != nil {
+			fmt.Printf("⚠️  Ошибка очистки таблицы products: %v\n", err)
+		}
 
-		if err := testDB.Close(); err != nil {
+		if err := testProductDB.Close(); err != nil {
 			fmt.Printf("⚠️  Ошибка закрытия БД: %v\n", err)
 		}
 	}
 
-	if postgresContainer != nil {
+	if postgresProductContainer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		if err := postgresContainer.Terminate(ctx); err != nil {
+		if err := postgresProductContainer.Terminate(ctx); err != nil {
 			fmt.Printf("⚠️  Ошибка при остановке контейнера: %v\n", err)
 		}
-		if removeError := postgresContainer.Terminate(context.Background()); removeError != nil {
-			fmt.Printf("⚠️  Ошибка при принудительном удалении: %v\n", removeError)
-		}
+		//if removeError := postgresProductContainer.Terminate(context.Background()); removeError != nil {
+		//	fmt.Printf("⚠️  Ошибка при принудительном удалении: %v\n", removeError)
+		//}
 	}
 
 	fmt.Println("✅ Тестовые ресурсы очищены")
 }
 
 // Пытается подключиться к БД с повторными попытками
-func connectWithRetries(dns string, maxRetries int, delay time.Duration) (*sql.DB, error) {
+func connectWithRetriesProducts(dns string, maxRetries int, delay time.Duration) (*sql.DB, error) {
 	var err error
 	var db *sql.DB
 
@@ -181,14 +185,14 @@ func createTestProduct(t *testing.T, name string, price int) (int, *ProductRepos
 	t.Helper()
 
 	// Очищает таблицу перед каждым тестом
-	_, err := testDB.Exec("TRUNCATE TABLE products RESTART IDENTITY CASCADE")
+	_, err := testProductDB.Exec("TRUNCATE TABLE products RESTART IDENTITY CASCADE")
 	if err != nil {
-		t.Fatalf("Failed to clean table: %v", err)
+		t.Fatalf("Failed to clean table products: %v", err)
 	}
 
 	repo := &ProductRepository{
-		db:     testDB,
-		logger: logger,
+		db:     testProductDB,
+		logger: productLogger,
 	}
 
 	id, err := repo.CreateProduct(name, price)
@@ -330,7 +334,7 @@ func TestProductRepository_GetAllProducts(t *testing.T) {
 	t.Run("Get all products from empty table", func(t *testing.T) {
 		_, repo := createTestProduct(t, "dummy", 1)
 		// Очищаем таблицу
-		testDB.Exec("TRUNCATE TABLE products RESTART IDENTITY CASCADE")
+		testProductDB.Exec("TRUNCATE TABLE products RESTART IDENTITY CASCADE")
 
 		products, err := repo.GetAllProducts()
 		if err != nil {
@@ -363,8 +367,7 @@ func TestProductRepository_DeleteProduct(t *testing.T) {
 		id int
 	}
 	tests := []struct {
-		name string
-		//fields  fields
+		name    string
 		args    args
 		wantErr bool
 	}{
