@@ -1,16 +1,11 @@
-package middleware
+package handler
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
-
-type AuthService interface {
-	Authenticate(ctx context.Context, token string) (int, error)
-}
 
 func AuthMiddleware(authService AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {

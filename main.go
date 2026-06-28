@@ -6,13 +6,14 @@ import (
 	"embed"
 	"fmt"
 	"go-learn/internal/handler"
-	"go-learn/internal/middleware"
+	userrepo "go-learn/internal/repo/postgres"
+	"go-learn/internal/repo/redis"
 	"io/fs"
-
-	authrepo "go-learn/internal/repo/auth"
-	orderepo "go-learn/internal/repo/order"
-	productrepo "go-learn/internal/repo/product"
-	userrepo "go-learn/internal/repo/user"
+	"net/http"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
 
 	authservice "go-learn/internal/service/auth"
 	orderservice "go-learn/internal/service/order"
@@ -26,7 +27,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
 	"github.com/pressly/goose/v3"
-	"github.com/redis/go-redis/v9"
+	redislib "github.com/redis/go-redis/v9"
 )
 
 //go:embed migrations/*.sql
@@ -39,8 +40,7 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
-	err := godotenv.Load()
-	if err != nil {
+	if err := godotenv.Load(); err != nil {
 		logger.Warn("⚠️  .env файл не найден, использую системные переменные")
 	}
 
@@ -54,7 +54,9 @@ func main() {
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
-	logger.Info("✅️ Кофигурация приложения выполнена")
+	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
+
+	logger.Info("✅️ Конфигурация приложения выполнена")
 
 	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ POSTGRES ===
 	conStr := fmt.Sprintf(
@@ -67,7 +69,7 @@ func main() {
 		logger.Error("Ошибка подключения к базе данных", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close() // Закроем соединение когда программа завершится
+	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
@@ -77,7 +79,7 @@ func main() {
 	logger.Info("✅ Успешно подключено к Postgres!")
 
 	// === ПОДКЛЮЧЕНИЕ К REDIS===
-	redisClient := redis.NewClient(&redis.Options{
+	redisClient := redislib.NewClient(&redislib.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
 		DB:       0,
@@ -111,18 +113,20 @@ func main() {
 	}
 	logger.Info("✅ Миграции успешно применены")
 
-	// === ИНИЦИАЛИЗАЦИЯ СЛОЕВ ===
-	orderRepo := orderepo.NewOrderRepository(redisClient, logger)
-	productRepo := productrepo.NewProductRepository(db, logger)
+	// === РЕПОЗИТОРИИ ===
+	orderRepo := redis.NewOrderRepository(redisClient, logger)
+	productRepo := userrepo.NewProductRepository(db, logger)
 	userRepo := userrepo.NewUserRepository(db, logger)
-	authRepo := authrepo.NewAuthRepository(db, logger)
-	sessionCache := authrepo.NewSessionCache(redisClient)
+	authRepo := userrepo.NewAuthRepository(db, logger)
+	sessionCache := redis.NewSessionCache(redisClient)
 
+	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, logger)
 	productService := productservice.NewProductService(productRepo, logger)
 	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
+	// === ХЕНДЛЕР ===
 	h := handler.NewHandler(productService, orderService, userService, authService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
@@ -136,7 +140,7 @@ func main() {
 
 	// Защищенные эндпоинты (требуют авторизацию)
 	auth := router.Group("/")
-	auth.Use(middleware.AuthMiddleware(authService))
+	auth.Use(handler.AuthMiddleware(authService))
 	{
 		auth.POST("/logout", h.Logout)
 		auth.DELETE("/product/delete/:id", h.DeleteProductById)
@@ -145,14 +149,48 @@ func main() {
 		auth.GET("/product/:id/orders", h.GetCounts)
 	}
 
-	// Запуск http-сервиса
-	fmt.Println("🌐 Started to http://localhost:" + serverPort)
-	err = router.Run(":" + serverPort)
-	if err != nil {
-		logger.Error("Ошибка создания таблицы", "error", err)
-		os.Exit(1)
+	// === GRACEFUL SHUTDOWN ===
+
+	// Создаем http-сервера с настройками
+	srv := &http.Server{
+		Addr:         ":" + serverPort,
+		Handler:      router,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	// Запуск http-сервиса в горутине
+	go func() {
+		logger.Info("🌐 Started to http://localhost:" + serverPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("Ошибка запуска сервера", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// === ОЖИДАНИЕ СИГНАЛА ===
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("🛑 Получен сигнал завершения, начинаем graceful shutdown...")
+	logger.Info(fmt.Sprintf("⏳ Ожидание завершения запросов (макс. %d сек)", shutdownTimeout))
+
+	// Создаем контекст с тайм-аутом
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeout)*time.Second)
+	defer cancel()
+
+	// === Завершение ===
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("❌ Принудительное завершение сервера", "error", err)
+	} else {
+		logger.Info("✅ Все запросы успешно завершены")
+	}
+	logger.Info("✅ Сервер остановлен")
 }
+
+// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
 func getEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
@@ -160,4 +198,16 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	result, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return result
 }

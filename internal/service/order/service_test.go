@@ -20,7 +20,7 @@ func TestOrderService_BuyProduct(t *testing.T) {
 	mockOrderRepo.EXPECT().IncrementOrder(gomock.Any(), gomock.Any()).AnyTimes().Return((int64(0)), nil)
 
 	type fields struct {
-		repo   OrderRepository
+		repo   OrderCacheInterface
 		logger *slog.Logger
 	}
 	type args struct {
@@ -111,7 +111,7 @@ func TestOrderService_GetOrderCount(t *testing.T) {
 	mockOrderRepo.EXPECT().GetOrder(gomock.Any(), gomock.Any()).AnyTimes().Return((int64(0)), nil)
 
 	type fields struct {
-		repo   OrderRepository
+		repo   OrderCacheInterface
 		logger *slog.Logger
 	}
 	type args struct {

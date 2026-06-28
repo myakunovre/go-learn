@@ -6,19 +6,19 @@ import (
 	"log/slog"
 )
 
-type ProductServiceInterface interface {
+type ProductService interface {
 	Delete(id int) error
 	Create(name string, price int) (int, error)
 	Get(id int) (*models.Product, error)
 	GetAllProducts() ([]models.Product, error)
 }
 
-type OrderServiceInterface interface {
+type OrderService interface {
 	BuyProduct(ctx context.Context, productID int) (int64, error)
 	GetOrderCount(ctx context.Context, productID int) (int64, error)
 }
 
-type UserServiceInterface interface {
+type UserService interface {
 	Create(name, email, password string) (int, error)
 }
 
@@ -29,17 +29,17 @@ type AuthService interface {
 }
 
 type Handler struct {
-	productService ProductServiceInterface
-	orderService   OrderServiceInterface
-	userService    UserServiceInterface
+	productService ProductService
+	orderService   OrderService
+	userService    UserService
 	authService    AuthService
 	logger         *slog.Logger
 }
 
 func NewHandler(
-	productService ProductServiceInterface,
-	orderService OrderServiceInterface,
-	userService UserServiceInterface,
+	productService ProductService,
+	orderService OrderService,
+	userService UserService,
 	authService AuthService,
 	logger *slog.Logger) *Handler {
 

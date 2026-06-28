@@ -1,4 +1,4 @@
-package user
+package postgres
 
 import (
 	"context"

@@ -67,7 +67,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 
 	// Кэшируем с TTL 30 секунд
 	if err := s.cache.SetSession(ctx, token, user.ID, 30*time.Second); err != nil {
-		s.logger.Warn("Failed to cache session", "error", err)
+		s.logger.Warn("Failed to redis session", "error", err)
 	}
 
 	s.logger.Info("User logged in", "user_id", user.ID, "email", email)

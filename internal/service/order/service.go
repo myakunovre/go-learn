@@ -7,17 +7,17 @@ import (
 	"log/slog"
 )
 
-type OrderRepository interface {
+type OrderCacheInterface interface {
 	IncrementOrder(ctx context.Context, productID int) (int64, error)
 	GetOrder(ctx context.Context, productID int) (int64, error)
 }
 
 type OrderService struct {
-	repo   OrderRepository
+	repo   OrderCacheInterface
 	logger *slog.Logger
 }
 
-func NewOrderService(repo OrderRepository, logger *slog.Logger) *OrderService {
+func NewOrderService(repo OrderCacheInterface, logger *slog.Logger) *OrderService {
 	return &OrderService{repo: repo, logger: logger}
 }
 
