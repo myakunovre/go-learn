@@ -1,0 +1,133 @@
+version: '3'
+
+vars:
+  APP_NAME: go-learn
+  BUILD_DIR: build
+  DB_USER: user
+  DB_PASSWORD: password
+  DB_HOST: localhost
+  DB_PORT: 5432
+  DB_NAME: postgres
+
+tasks:
+  # Запуск приложения
+  run:
+    desc: Запустить приложение
+    cmds:
+      - go run main.go
+
+  # Сборка
+  build:
+    desc: Собрать бинарник
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+      - go build -o {{.BUILD_DIR}}/{{.APP_NAME}} main.go
+
+  # Очистка
+  clean:
+    desc: Очистить сборку
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - go clean
+
+  # Тесты
+  test:
+    desc: Запустить тесты
+    cmds:
+      - go test ./... -v
+
+  # Тесты с покрытием
+  test-coverage:
+    desc: Запустить тесты с отчетом о покрытии
+    cmds:
+      - go test ./... -coverprofile=coverage.out
+      - go tool cover -html=coverage.out -o coverage.html
+
+  # Линтер
+  lint:
+    desc: Запустить линтер
+    cmds:
+      - golangci-lint run ./...
+
+  # Миграции
+  migrate-up:
+    desc: Применить миграции
+    cmds:
+      - goose -dir migrations postgres "host={{.DB_HOST}} port={{.DB_PORT}} user={{.DB_USER}} password={{.DB_PASSWORD}} dbname={{.DB_NAME}} sslmode=disable" up
+
+  migrate-down:
+    desc: Откатить миграции
+    cmds:
+      - goose -dir migrations postgres "host={{.DB_HOST}} port={{.DB_PORT}} user={{.DB_USER}} password={{.DB_PASSWORD}} dbname={{.DB_NAME}} sslmode=disable" down
+
+  migrate-reset:
+    desc: Сбросить миграции
+    cmds:
+      - goose -dir migrations postgres "host={{.DB_HOST}} port={{.DB_PORT}} user={{.DB_USER}} password={{.DB_PASSWORD}} dbname={{.DB_NAME}} sslmode=disable" reset
+
+  migrate-status:
+    desc: Проверить статус миграций
+    cmds:
+      - goose -dir migrations postgres "host={{.DB_HOST}} port={{.DB_PORT}} user={{.DB_USER}} password={{.DB_PASSWORD}} dbname={{.DB_NAME}} sslmode=disable" status
+
+  # Docker
+  docker-up:
+    desc: Запустить Docker окружение
+    cmds:
+      - docker-compose up -d
+
+  docker-down:
+    desc: Остановить Docker окружение
+    cmds:
+      - docker-compose down
+
+  docker-logs:
+    desc: Показать логи Docker
+    cmds:
+      - docker-compose logs -f
+
+  # Зависимости
+  deps:
+    desc: Установить зависимости
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  # Форматирование
+  fmt:
+    desc: Форматировать код
+    cmds:
+      - go fmt ./...
+
+  # Генерация моков для тестов
+  generate:
+    desc: Генерировать моки
+    cmds:
+      - go generate ./...
+
+  # Полная проверка перед коммитом
+  check:
+    desc: Полная проверка кода
+    deps: [fmt, lint, test]
+    cmds:
+      - echo "✅ All checks passed!"
+
+  # Быстрый запуск с миграциями
+  dev:
+    desc: Запустить в режиме разработки (с миграциями)
+    cmds:
+      - task: docker-up
+      - task: migrate-up
+      - task: run
+
+  # Просмотр логов приложения
+  logs:
+    desc: Показать логи приложения
+    cmds:
+      - tail -f app.log
+
+  # Помощь
+  help:
+    desc: Показать справку
+    cmds:
+      - task --list

@@ -8,45 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) DeleteProductById(c *gin.Context) {
-	h.logger.Debug("Called DeleteProductById with id=%d", c.Param("id"))
-
-	// Получаем ID из URL‑пути
-	idStr := c.Param("id")
-	if idStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID parameter is required",
-		})
-		h.logger.Warn("ID parameter is required")
-		return
-	}
-
-	// Конвертируем ID в число
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid id format",
-		})
-		h.logger.Warn("invalid id format")
-		return
-	}
-
-	// Удаляем товар через сервис
-	err = h.productService.Delete(id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
-		h.logger.Error("Error Deleting Product", "id", id, "error", err)
-		return
-	}
-
-	h.logger.Info("Delete Product Success", "id", id)
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Product deleted successfully",
-	})
-}
-
 func (h *Handler) CreateProduct(c *gin.Context) {
 	h.logger.Info("Called CreateProduct")
 
@@ -150,4 +111,43 @@ func (h *Handler) GetAllProducts(c *gin.Context) {
 		"products": products,
 	})
 	h.logger.Info("Products found successfully", "products", len(products))
+}
+
+func (h *Handler) DeleteProductById(c *gin.Context) {
+	h.logger.Debug("Called DeleteProductById with id=%d", c.Param("id"))
+
+	// Получаем ID из URL‑пути
+	idStr := c.Param("id")
+	if idStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID parameter is required",
+		})
+		h.logger.Warn("ID parameter is required")
+		return
+	}
+
+	// Конвертируем ID в число
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid id format",
+		})
+		h.logger.Warn("invalid id format")
+		return
+	}
+
+	// Удаляем товар через сервис
+	err = h.productService.Delete(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		h.logger.Error("Error Deleting Product", "id", id, "error", err)
+		return
+	}
+
+	h.logger.Info("Delete Product Success", "id", id)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Product deleted successfully",
+	})
 }

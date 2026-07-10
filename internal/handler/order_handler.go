@@ -7,15 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//type OrderHandler struct {
-//	productService    *service.OrderService
-//	logger *slog.Logger
-//}
-//
-//func NewOrderHandler(productService *service.OrderService, logger *slog.Logger) *OrderHandler {
-//	return &OrderHandler{productService: productService, logger: logger}
-//}
-
 func (h *Handler) BuyProduct(c *gin.Context) {
 	h.logger.Debug("[OrderHandler] Buying product", "productId", c.Param("id"))
 

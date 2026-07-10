@@ -1,17 +1,18 @@
-package service
+package order
 
 import (
 	"context"
 	"go-learn/internal/service/mocks"
 	"log/slog"
+	"os"
 	"testing"
 
 	"go.uber.org/mock/gomock"
 )
 
-//var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-//	Level: slog.LevelDebug,
-//}))
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	Level: slog.LevelDebug,
+}))
 
 func TestOrderService_BuyProduct(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -19,7 +20,7 @@ func TestOrderService_BuyProduct(t *testing.T) {
 	mockOrderRepo.EXPECT().IncrementOrder(gomock.Any(), gomock.Any()).AnyTimes().Return((int64(0)), nil)
 
 	type fields struct {
-		repo   OrderRepository
+		repo   OrderCacheInterface
 		logger *slog.Logger
 	}
 	type args struct {
@@ -110,7 +111,7 @@ func TestOrderService_GetOrderCount(t *testing.T) {
 	mockOrderRepo.EXPECT().GetOrder(gomock.Any(), gomock.Any()).AnyTimes().Return((int64(0)), nil)
 
 	type fields struct {
-		repo   OrderRepository
+		repo   OrderCacheInterface
 		logger *slog.Logger
 	}
 	type args struct {
