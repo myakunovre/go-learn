@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"go-learn/internal/events"
 	"go-learn/internal/handler"
 	userrepo "go-learn/internal/repo/postgres"
 	"go-learn/internal/repo/redis"
@@ -28,6 +29,9 @@ import (
 	_ "github.com/lib/pq" // Драйвер для Postgres
 	"github.com/pressly/goose/v3"
 	redislib "github.com/redis/go-redis/v9"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go-learn/internal/metrics"
 )
 
 //go:embed migrations/*.sql
@@ -122,7 +126,8 @@ func main() {
 
 	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, logger)
-	productService := productservice.NewProductService(productRepo, logger)
+	eventPublisher := events.NewLoggerEventPublisher(logger)
+	productService := productservice.NewProductService(productRepo, logger, eventPublisher)
 	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
@@ -131,6 +136,12 @@ func main() {
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
+
+	// Подключаем middleware для сбора метрик (перед всеми маршрутами)
+	router.Use(metrics.PrometheusMiddleware())
+
+	// Эндпоинт для Prometheus
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Публичные эндпоинты
 	router.POST("/user/create", h.CreateUser)

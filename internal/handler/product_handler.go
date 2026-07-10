@@ -38,7 +38,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	id, err := h.productService.Create(req.Name, req.Price)
+	id, err := h.productService.Create(c.Request.Context(), req.Name, req.Price)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -137,7 +137,7 @@ func (h *Handler) DeleteProductById(c *gin.Context) {
 	}
 
 	// Удаляем товар через сервис
-	err = h.productService.Delete(id)
+	err = h.productService.Delete(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

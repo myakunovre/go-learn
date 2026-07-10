@@ -1,8 +1,10 @@
 package product
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"go-learn/internal/events"
 	"go-learn/models"
 	"log/slog"
 )
@@ -15,18 +17,20 @@ type ProductRepository interface {
 }
 
 type ProductService struct {
-	repo   ProductRepository
-	logger *slog.Logger
+	repo      ProductRepository
+	logger    *slog.Logger
+	publisher events.EventPublisher
 }
 
-func NewProductService(repo ProductRepository, logger *slog.Logger) *ProductService {
+func NewProductService(repo ProductRepository, logger *slog.Logger, publisher events.EventPublisher) *ProductService {
 	return &ProductService{
-		repo:   repo,
-		logger: logger,
+		repo:      repo,
+		logger:    logger,
+		publisher: publisher,
 	}
 }
 
-func (s *ProductService) Create(name string, price int) (int, error) {
+func (s *ProductService) Create(ctx context.Context, name string, price int) (int, error) {
 	if price <= 0 {
 		s.logger.Error("[ProductService] Price less than zero", "price", price)
 		return 0, errors.New("price less than zero")
@@ -41,6 +45,17 @@ func (s *ProductService) Create(name string, price int) (int, error) {
 	if err != nil {
 		s.logger.Error("[ProductService] Error of creating product", "name", name, "error", err)
 		return 0, fmt.Errorf("product creation failed: %w", err)
+	}
+
+	// Публикуем событие
+	event := events.ProductCreated{
+		ProductID: id,
+		Name:      name,
+		Price:     price,
+	}
+	if pubErr := s.publisher.Publish(ctx, "product-events", event); pubErr != nil {
+		s.logger.Warn("Failed to publish ProductCreated event", "error", pubErr)
+		// Не возвращаем ошибку, чтобы не нарушать основную операцию
 	}
 
 	s.logger.Info("[ProductService] ✅ Product created successfully", "id", id, "name", name, "price", price)
@@ -74,7 +89,7 @@ func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 	return products, nil
 }
 
-func (s *ProductService) Delete(id int) error {
+func (s *ProductService) Delete(ctx context.Context, id int) error {
 	if id <= 0 {
 		s.logger.Warn("product id should be greater than zero")
 		return errors.New("product id should be greater than zero")
@@ -84,6 +99,11 @@ func (s *ProductService) Delete(id int) error {
 	if err != nil {
 		s.logger.Error("[ProductService] Error of deleting product", "id", id, "error", err)
 		return fmt.Errorf("failed to delete product with id %d: %v", id, err)
+	}
+
+	event := events.ProductDeleted{ProductID: id}
+	if pubErr := s.publisher.Publish(ctx, "product-events", event); pubErr != nil {
+		s.logger.Warn("Failed to publish ProductDeleted event", "error", pubErr)
 	}
 
 	s.logger.Info("[ProductService] ✅ Product deleted successfully", "id", id)
