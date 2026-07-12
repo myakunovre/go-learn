@@ -44,6 +44,7 @@ func main() {
 		Level: slog.LevelDebug,
 	}))
 
+	// === ЗАГРУЖАЕМ НАСТРОЙКИ ИЗ ENV-ФАЙЛА ===
 	if err := godotenv.Load(); err != nil {
 		logger.Warn("⚠️  .env файл не найден, использую системные переменные")
 	}
