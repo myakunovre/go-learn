@@ -26,11 +26,19 @@ var (
 		},
 		[]string{"method", "path"},
 	)
+	// Количество ошибок (4xx и 5xx)
+	RequestErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_request_errors_total",
+			Help: "Total number of HTTP request errors (4xx and 5xx)",
+		},
+		[]string{"method", "path", "status"},
+	)
 )
 
 func init() {
 	// Регистрируем метрики
-	prometheus.MustRegister(RequestsTotal, RequestDuration)
+	prometheus.MustRegister(RequestsTotal, RequestDuration, RequestErrors)
 }
 
 // PrometheusMiddleware возвращает gin.HandlerFunc для сбора метрик
@@ -49,5 +57,9 @@ func PrometheusMiddleware() gin.HandlerFunc {
 		RequestsTotal.WithLabelValues(method, path, status).Inc()
 		// Записываем длительность
 		RequestDuration.WithLabelValues(method, path).Observe(duration)
+		// Считаем ошибки (4xx и 5xx)
+		if c.Writer.Status() >= 400 {
+			RequestErrors.WithLabelValues(method, path, status).Inc()
+		}
 	}
 }

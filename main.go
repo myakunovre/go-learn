@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -30,8 +31,9 @@ import (
 	"github.com/pressly/goose/v3"
 	redislib "github.com/redis/go-redis/v9"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go-learn/internal/metrics"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 //go:embed migrations/*.sql
@@ -59,6 +61,7 @@ func main() {
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
+	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
 	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
 
 	logger.Info("✅️ Конфигурация приложения выполнена")
@@ -125,9 +128,18 @@ func main() {
 	authRepo := userrepo.NewAuthRepository(db, logger)
 	sessionCache := redis.NewSessionCache(redisClient)
 
+	// === EVENT PUBLISHER (KAFKA) ===
+	brokers := strings.Split(kafkaBrokers, ",")
+	eventPublisher := events.NewKafkaEventPublisher(brokers, logger)
+	defer func() {
+		if err := eventPublisher.Close(); err != nil {
+			logger.Error("Ошибка при закрытии Kafka publisher", "error", err)
+		}
+	}()
+	logger.Info("✅ Kafka publisher создан", "brokers", brokers)
+
 	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, logger)
-	eventPublisher := events.NewLoggerEventPublisher(logger)
 	productService := productservice.NewProductService(productRepo, logger, eventPublisher)
 	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
@@ -193,7 +205,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeout)*time.Second)
 	defer cancel()
 
-	// === Завершение ===
+	// === Завершение HTTP сервера ===
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("❌ Принудительное завершение сервера", "error", err)
 	} else {
