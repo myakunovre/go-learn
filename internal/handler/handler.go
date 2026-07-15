@@ -7,8 +7,8 @@ import (
 )
 
 type ProductService interface {
-	Delete(id int) error
-	Create(name string, price int) (int, error)
+	Delete(ctx context.Context, id int) error
+	Create(ctx context.Context, name string, price int) (int, error)
 	Get(id int) (*models.Product, error)
 	GetAllProducts() ([]models.Product, error)
 }
