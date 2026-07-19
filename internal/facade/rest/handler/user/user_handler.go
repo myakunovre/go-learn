@@ -1,16 +1,31 @@
-package handler
+package user
 
 import (
 	"fmt"
+	"go-learn/internal/facade/rest/handler/models"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
+type UserService interface {
+	Create(name, email, password string) (int, error)
+}
+
+type Handler struct {
+	userService UserService
+	logger      *slog.Logger
+}
+
+func NewHandler(userService UserService, logger *slog.Logger) *Handler {
+	return &Handler{userService: userService, logger: logger}
+}
+
 func (h *Handler) CreateUser(c *gin.Context) {
 	h.logger.Info("Called CreateUser")
 
-	var req CreateUserRequest
+	var req models.CreateUserRequest
 
 	// Привязываем JSON к структуре
 	if err := c.ShouldBindJSON(&req); err != nil {

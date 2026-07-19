@@ -1,4 +1,4 @@
-package postgres
+package sesssion
 
 import (
 	"database/sql"

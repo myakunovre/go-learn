@@ -3,24 +3,24 @@ package main
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"fmt"
 	"go-learn/internal/events"
-	"go-learn/internal/handler"
-	userrepo "go-learn/internal/repo/postgres"
-	"go-learn/internal/repo/redis"
-	"io/fs"
-	"net/http"
-	"os/signal"
-	"strconv"
+	authhandler "go-learn/internal/facade/rest/handler/auth"
+	orderhandler "go-learn/internal/facade/rest/handler/order"
+	userrepo "go-learn/internal/repo/postgres/sesssion"
+	"go-learn/internal/repo/redis/order"
+	"go-learn/internal/repo/redis/session"
 	"strings"
-	"syscall"
-	"time"
 
 	authservice "go-learn/internal/service/auth"
 	orderservice "go-learn/internal/service/order"
-	productservice "go-learn/internal/service/product"
-	userservice "go-learn/internal/service/user"
+
+	"go-learn/migrations"
+	"net/http"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
 
 	"log/slog"
 	"os"
@@ -36,9 +36,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-//go:embed migrations/*.sql
-var embedMigrations embed.FS
-
 func main() {
 
 	// === СОЗДАЕМ ЛОГГЕР ===
@@ -52,11 +49,11 @@ func main() {
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
-	dbUser := getEnv("DB_USER", "user")
-	dbPass := getEnv("DB_PASSWORD", "password")
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbName := getEnv("DB_NAME", "postgres")
+	dbUser := getEnv("DB_ORDER_USER", "user")
+	dbPass := getEnv("DB_ORDER_PASSWORD", "password")
+	dbHost := getEnv("DB_ORDER_HOST", "localhost")
+	dbPort := getEnv("DB_ORDER_PORT", "5433")
+	dbName := getEnv("DB_ORDER_NAME", "postgres")
 	serverPort := getEnv("SERVER_PORT", "8080")
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
@@ -64,7 +61,7 @@ func main() {
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
 	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
 
-	logger.Info("✅️ Конфигурация приложения выполнена")
+	logger.Info("✅️ [Orders] Конфигурация приложения выполнена")
 
 	// === ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ POSTGRES ===
 	conStr := fmt.Sprintf(
@@ -108,13 +105,7 @@ func main() {
 	logger.Info("✅ Успешно подключено к Redis!")
 
 	// === НАКАТЫВАЕМ МИГРАЦИЮ
-	migrationsFS, err := fs.Sub(embedMigrations, "migrations")
-	if err != nil {
-		logger.Error("Ошибка извлечения миграций", "error", err)
-		os.Exit(1)
-	}
-
-	goose.SetBaseFS(migrationsFS)
+	goose.SetBaseFS(migrations.MigrationsFS)
 	if err := goose.Up(db, "."); err != nil {
 		logger.Error("Ошибка миграции", "error", err)
 		os.Exit(1)
@@ -122,11 +113,9 @@ func main() {
 	logger.Info("✅ Миграции успешно применены")
 
 	// === РЕПОЗИТОРИИ ===
-	orderRepo := redis.NewOrderRepository(redisClient, logger)
-	productRepo := userrepo.NewProductRepository(db, logger)
-	userRepo := userrepo.NewUserRepository(db, logger)
+	orderRepo := order.NewOrderRepository(redisClient, logger)
 	authRepo := userrepo.NewAuthRepository(db, logger)
-	sessionCache := redis.NewSessionCache(redisClient)
+	sessionCache := session.NewSessionCache(redisClient)
 
 	// === EVENT PUBLISHER (KAFKA) ===
 	brokers := strings.Split(kafkaBrokers, ",")
@@ -138,14 +127,19 @@ func main() {
 	}()
 	logger.Info("✅ Kafka publisher создан", "brokers", brokers)
 
+	// === KAFKA CONSUMER ===
+	productConsumer := events.NewProductConsumer(brokers, logger)
+	defer productConsumer.Close()
+
+	ctx = context.Background()
+	productConsumer.Start(ctx)
+
 	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, logger)
-	productService := productservice.NewProductService(productRepo, logger, eventPublisher)
-	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
 	// === ХЕНДЛЕР ===
-	h := handler.NewHandler(productService, orderService, userService, authService, logger)
+	h := orderhandler.NewHandler(orderService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
@@ -156,19 +150,10 @@ func main() {
 	// Эндпоинт для Prometheus
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// Публичные эндпоинты
-	router.POST("/user/create", h.CreateUser)
-	router.POST("/login", h.Login)
-	router.GET("/product/:id", h.GetProductById)
-	router.GET("/products", h.GetAllProducts)
-
 	// Защищенные эндпоинты (требуют авторизацию)
 	auth := router.Group("/")
-	auth.Use(handler.AuthMiddleware(authService))
+	auth.Use(authhandler.AuthMiddleware(authService))
 	{
-		auth.POST("/logout", h.Logout)
-		auth.DELETE("/product/delete/:id", h.DeleteProductById)
-		auth.POST("/product/create", h.CreateProduct)
 		auth.POST("/buy/product/:id", h.BuyProduct)
 		auth.GET("/product/:id/orders", h.GetCounts)
 	}

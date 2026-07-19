@@ -1,11 +1,27 @@
-package handler
+package order
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
+
+type OrderService interface {
+	BuyProduct(ctx context.Context, productID int) (int64, error)
+	GetOrderCount(ctx context.Context, productID int) (int64, error)
+}
+
+type Handler struct {
+	orderService OrderService
+	logger       *slog.Logger
+}
+
+func NewHandler(orderService OrderService, logger *slog.Logger) *Handler {
+	return &Handler{orderService: orderService, logger: logger}
+}
 
 func (h *Handler) BuyProduct(c *gin.Context) {
 	h.logger.Debug("[OrderHandler] Buying product", "productId", c.Param("id"))

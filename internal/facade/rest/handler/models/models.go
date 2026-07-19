@@ -1,4 +1,4 @@
-package handler
+package models
 
 // CreateProductRequest Структура для входящих данных продукта
 type CreateProductRequest struct {

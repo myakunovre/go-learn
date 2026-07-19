@@ -19,6 +19,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # База данных PostgreSQL (orderService)
+  postgres_order:
+    image: postgres:15-alpine
+    container_name: go-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: orders_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data_order  # Исправил имя тома
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # База данных Redis (кеш-база)
   redis:
     image: redis:7-alpine

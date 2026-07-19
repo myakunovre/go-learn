@@ -1,6 +1,8 @@
-package handler
+package auth
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +11,21 @@ import (
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
+}
+
+type AuthService interface {
+	Login(ctx context.Context, email, password string) (string, error)
+	Authenticate(ctx context.Context, token string) (int, error)
+	Logout(ctx context.Context, token string) error
+}
+
+type Handler struct {
+	authService AuthService
+	logger      *slog.Logger
+}
+
+func NewHandler(authService AuthService, logger *slog.Logger) *Handler {
+	return &Handler{authService: authService, logger: logger}
 }
 
 func (h *Handler) Login(c *gin.Context) {

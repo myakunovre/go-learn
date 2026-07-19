@@ -1,17 +1,37 @@
-package handler
+package product
 
 import (
+	"context"
 	"fmt"
+	models2 "go-learn/internal/facade/rest/handler/models"
+	"go-learn/models"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
+type ProductService interface {
+	Delete(ctx context.Context, id int) error
+	Create(ctx context.Context, name string, price int) (int, error)
+	Get(id int) (*models.Product, error)
+	GetAllProducts() ([]models.Product, error)
+}
+
+type Handler struct {
+	productService ProductService
+	logger         *slog.Logger
+}
+
+func NewHandler(productService ProductService, logger *slog.Logger) *Handler {
+	return &Handler{productService: productService, logger: logger}
+}
+
 func (h *Handler) CreateProduct(c *gin.Context) {
 	h.logger.Info("Called CreateProduct")
 
-	var req CreateProductRequest
+	var req models2.CreateProductRequest
 
 	// Привязываем JSON к структуре
 	if err := c.ShouldBindJSON(&req); err != nil {
