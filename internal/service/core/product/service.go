@@ -47,7 +47,7 @@ func (s *ProductService) Create(ctx context.Context, name string, price int) (in
 		return 0, fmt.Errorf("product creation failed: %w", err)
 	}
 
-	// Публикуем событие
+	// Публикуем событие о создании товара через KAFKA
 	event := events.ProductCreated{
 		ProductID: id,
 		Name:      name,
@@ -101,6 +101,25 @@ func (s *ProductService) Delete(ctx context.Context, id int) error {
 		return fmt.Errorf("failed to delete product with id %d: %v", id, err)
 	}
 
+	//анализируем цену товара
+	product, err := s.repo.GetProduct(id)
+	if err != nil {
+		s.logger.Error("[ProductService] Error of getting product", "id", id, "error", err)
+	}
+	price := product.Price
+
+	if price < 1000 {
+		s.logger.Info("[ProductService] ✅ Product deleted successfully", "id", id)
+		return nil
+	}
+
+	if price > 10000 {
+		//todo отменить удаление (транзакция)
+		s.logger.Info("[ProductService] ✅ Product not deleted, price must be smaller than 10000", "id", id)
+		return nil
+	}
+
+	// Публикуем событие об удалении товара через KAFKA
 	event := events.ProductDeleted{ProductID: id}
 	if pubErr := s.publisher.Publish(ctx, "product-events", event); pubErr != nil {
 		s.logger.Warn("Failed to publish ProductDeleted event", "error", pubErr)

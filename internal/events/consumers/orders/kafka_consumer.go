@@ -1,8 +1,9 @@
-package events
+package orders
 
 import (
 	"context"
 	"encoding/json"
+	"go-learn/internal/events"
 	"log/slog"
 
 	"github.com/segmentio/kafka-go"
@@ -54,7 +55,7 @@ func (c *ProductConsumer) Start(ctx context.Context) {
 func (c *ProductConsumer) handleMessage(msg kafka.Message) {
 	switch string(msg.Key) {
 	case "product.deleted":
-		var event ProductDeleted
+		var event events.ProductDeleted
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
 			c.logger.Error("Failed to unmarshal product.deleted", "error", err)
 			return

@@ -1,8 +1,9 @@
-package events
+package products
 
 import (
 	"context"
 	"encoding/json"
+	"go-learn/internal/events"
 	"log/slog"
 
 	"github.com/segmentio/kafka-go"
@@ -25,7 +26,7 @@ func NewKafkaEventPublisher(brokers []string, logger *slog.Logger) *KafkaEventPu
 	}
 }
 
-func (p *KafkaEventPublisher) Publish(ctx context.Context, topic string, event Event) error {
+func (p *KafkaEventPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		p.logger.Error("Failed to marshal event", "error", err)
@@ -44,10 +45,7 @@ func (p *KafkaEventPublisher) Publish(ctx context.Context, topic string, event E
 		return err
 	}
 
-	p.logger.Info("Event published to Kafka",
-		"topic", topic,
-		"event_type", event.GetType(),
-	)
+	p.logger.Info("Event published to Kafka", "topic", topic, "event_type", event.GetType())
 	return nil
 }
 

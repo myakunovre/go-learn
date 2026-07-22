@@ -1,6 +1,7 @@
 package product
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"go-learn/models"
@@ -109,4 +110,12 @@ func (r *ProductRepository) DeleteProduct(id int) error {
 
 	r.logger.Info("[ProductRepository] Product deleted successfully", "id", id)
 	return nil
+}
+
+func (r *ProductRepository) WithTransaction(ctx context.Context, cb func(c *ProductRepository) error) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+
+	}
+
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"go-learn/internal/events"
+	"go-learn/internal/events/producers/products"
 	auth2 "go-learn/internal/facade/rest/handler/auth"
 	producthandler "go-learn/internal/facade/rest/handler/product"
 	userhandler "go-learn/internal/facade/rest/handler/user"
@@ -12,7 +12,9 @@ import (
 	"go-learn/internal/repo/postgres/sesssion"
 	userrepo "go-learn/internal/repo/postgres/user"
 	"go-learn/internal/repo/redis/session"
-
+	authservice "go-learn/internal/service/core/auth"
+	productservice "go-learn/internal/service/core/product"
+	userservice "go-learn/internal/service/core/user"
 	"go-learn/migrations"
 	"net/http"
 	"os/signal"
@@ -20,10 +22,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	authservice "go-learn/internal/service/auth"
-	productservice "go-learn/internal/service/product"
-	userservice "go-learn/internal/service/user"
 
 	"log/slog"
 	"os"
@@ -52,16 +50,21 @@ func main() {
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
-	dbUser := getEnv("DB_USER", "user")
-	dbPass := getEnv("DB_PASSWORD", "password")
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbName := getEnv("DB_NAME", "postgres")
 	serverPort := getEnv("SERVER_PORT", "8080")
-	redisHost := getEnv("REDIS_HOST", "localhost")
-	redisPort := getEnv("REDIS_PORT", "6379")
-	redisPassword := getEnv("REDIS_PASSWORD", "")
+	//Postgres
+	dbUser := getEnv("CORE_DB_USER", "user")
+	dbPass := getEnv("CORE_DB_PASSWORD", "password")
+	dbHost := getEnv("CORE_DB_HOST", "localhost")
+	dbPort := getEnv("CORE_DB_PORT", "5432")
+	dbName := getEnv("CORE_DB_NAME", "postgres")
+	//Redis
+	redisHost := getEnv("CORE_REDIS_HOST", "localhost")
+	redisPort := getEnv("CORE_REDIS_PORT", "6379")
+	redisDB := getEnvInt("CORE_REDIS_DB", 0)
+	redisPassword := getEnv("CORE_REDIS_PASSWORD", "")
+	//Kafka
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
+	//Graceful Shutdown
 	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
 
 	logger.Info("✅️ Конфигурация приложения выполнена")
@@ -90,7 +93,7 @@ func main() {
 	redisClient := redislib.NewClient(&redislib.Options{
 		Addr:     redisHost + ":" + redisPort,
 		Password: redisPassword,
-		DB:       0,
+		DB:       redisDB,
 	})
 	defer func() {
 		if err := redisClient.Close(); err != nil {
@@ -108,7 +111,7 @@ func main() {
 	logger.Info("✅ Успешно подключено к Redis!")
 
 	// === НАКАТЫВАЕМ МИГРАЦИЮ
-	goose.SetBaseFS(migrations.MigrationsFS)
+	goose.SetBaseFS(migrations.CoreMigrationsFS)
 	if err := goose.Up(db, "."); err != nil {
 		logger.Error("Ошибка миграции", "error", err)
 		os.Exit(1)
@@ -116,23 +119,25 @@ func main() {
 	logger.Info("✅ Миграции успешно применены")
 
 	// === РЕПОЗИТОРИИ ===
+	//postgres
 	productRepo := product.NewProductRepository(db, logger)
 	userRepo := userrepo.NewUserRepository(db, logger)
 	authRepo := sesssion.NewAuthRepository(db, logger)
+	// redis
 	sessionCache := session.NewSessionCache(redisClient)
 
 	// === EVENT PUBLISHER (KAFKA) ===
 	brokers := strings.Split(kafkaBrokers, ",")
-	eventPublisher := events.NewKafkaEventPublisher(brokers, logger)
+	productEventPublisher := products.NewKafkaEventPublisher(brokers, logger)
 	defer func() {
-		if err := eventPublisher.Close(); err != nil {
+		if err := productEventPublisher.Close(); err != nil {
 			logger.Error("Ошибка при закрытии Kafka publisher", "error", err)
 		}
 	}()
 	logger.Info("✅ Kafka publisher создан", "brokers", brokers)
 
 	// === СЕРВИСЫ ===
-	productService := productservice.NewProductService(productRepo, logger, eventPublisher)
+	productService := productservice.NewProductService(productRepo, logger, productEventPublisher)
 	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 

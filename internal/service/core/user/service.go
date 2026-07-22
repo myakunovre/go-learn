@@ -21,7 +21,7 @@ type UserService struct {
 
 var emailRe = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
-func IsValidEmailSimple(email string) bool {
+func isValidEmailSimple(email string) bool {
 	email = strings.TrimSpace(email)
 	return emailRe.MatchString(email)
 }
@@ -35,7 +35,7 @@ func NewUserService(repo UserRepository, logger *slog.Logger) *UserService {
 
 func (s *UserService) Create(name, email, password string) (int, error) {
 	// Проверка email на валидность
-	if !IsValidEmailSimple(email) {
+	if !isValidEmailSimple(email) {
 		s.logger.Error("[UserService] Email is not valid", "email", email)
 		return 0, errors.New("invalid email")
 	}

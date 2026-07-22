@@ -3,4 +3,5 @@ package migrations
 import "embed"
 
 //go:embed *.sql
-var MigrationsFS embed.FS
+var CoreMigrationsFS embed.FS
+var OrderMigrationsFS embed.FS
