@@ -6,10 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go-learn/models"
 	"log/slog"
 	"time"
-
-	"go-learn/models"
 
 	"golang.org/x/crypto/bcrypt"
 )

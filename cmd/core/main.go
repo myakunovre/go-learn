@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"go-learn/internal/events/producers/products"
+	"go-learn/internal/facade/grpc/core"
 	auth2 "go-learn/internal/facade/rest/handler/auth"
 	producthandler "go-learn/internal/facade/rest/handler/product"
 	userhandler "go-learn/internal/facade/rest/handler/user"
@@ -26,13 +27,13 @@ import (
 	"log/slog"
 	"os"
 
+	"go-learn/internal/metrics"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // Драйвер для Postgres
 	"github.com/pressly/goose/v3"
 	redislib "github.com/redis/go-redis/v9"
-
-	"go-learn/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -64,6 +65,8 @@ func main() {
 	redisPassword := getEnv("CORE_REDIS_PASSWORD", "")
 	//Kafka
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
+	//GRPC
+	grpcPort := getEnv("CORE_GRPC_PORT", "50051")
 	//Graceful Shutdown
 	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
 
@@ -141,8 +144,18 @@ func main() {
 	userService := userservice.NewUserService(userRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
+	// Запуск GRPC-сервера
+	productGRPCServer := core.NewProductGRPCServer(productService, logger)
+
+	go func() {
+		if err := productGRPCServer.Start(grpcPort); err != nil {
+			logger.Error("gRPC server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+	logger.Info("✅ gRPC server started", "port", grpcPort)
+
 	// === ХЕНДЛЕР ===
-	//h := handler.NewHandler(productService, userService, authService, logger)
 	ph := producthandler.NewHandler(productService, logger)
 	uh := userhandler.NewHandler(userService, logger)
 	ah := auth2.NewHandler(authService, logger)
@@ -169,6 +182,7 @@ func main() {
 		auth.POST("/logout", ah.Logout)
 		auth.DELETE("/product/delete/:id", ph.DeleteProductById)
 		auth.POST("/product/create", ph.CreateProduct)
+		auth.PUT("/product/add", ph.AddProduct)
 	}
 
 	// === GRACEFUL SHUTDOWN ===

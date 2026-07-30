@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option go_package = "go-learn/api/grpc/pb";
+
+package order;
+
+// Забронированный товар
+message BookedProduct {
+  int64 product_id = 1;
+  int32 amount = 2;
+}
+
+// Запрос списка забронированных товаров
+message GetBookedProductsRequest {
+}
+
+// Ответ со списком забронированных товаров
+message BookedProductsResponse {
+  repeated BookedProduct bookedProducts = 1;
+}
+
+// Сервис для работы с заказами (Order-сервис)
+service OrderService {
+  rpc GetBookedProducts (GetBookedProductsRequest) returns (BookedProductsResponse);
+}

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"go-learn/internal/events/consumers/orders"
-	"go-learn/internal/events/producers/products"
 	authhandler "go-learn/internal/facade/rest/handler/auth"
 	orderhandler "go-learn/internal/facade/rest/handler/order"
 	userrepo "go-learn/internal/repo/postgres/sesssion"
@@ -122,32 +121,23 @@ func main() {
 	//postgres
 	authRepo := userrepo.NewAuthRepository(db, logger)
 	// redis
-	orderRepo := order.NewOrderRepository(redisClient, logger)
+	orderCacheRepo := order.NewOrderCacheRepository(redisClient, logger)
 	sessionCache := session.NewSessionCache(redisClient)
 
-	// === EVENT PUBLISHER (KAFKA) ===
-	brokers := strings.Split(kafkaBrokers, ",")
-	eventPublisher := products.NewKafkaEventPublisher(brokers, logger)
-	defer func() {
-		if err := eventPublisher.Close(); err != nil {
-			logger.Error("Ошибка при закрытии Kafka publisher", "error", err)
-		}
-	}()
-	logger.Info("✅ Kafka publisher создан", "brokers", brokers)
-
 	// === KAFKA CONSUMER ===
-	productConsumer := orders.NewProductConsumer(brokers, logger)
+	brokers := strings.Split(kafkaBrokers, ",")
+	productConsumer := orders.NewProductConsumer(brokers, orderCacheRepo, logger)
 	defer productConsumer.Close()
 
 	ctx = context.Background()
 	productConsumer.Start(ctx)
 
 	// === СЕРВИСЫ ===
-	orderService := orderservice.NewOrderService(orderRepo, logger)
+	orderCacheService := orderservice.NewOrderCacheService(orderCacheRepo, logger)
 	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
 	// === ХЕНДЛЕР ===
-	h := orderhandler.NewHandler(orderService, logger)
+	h := orderhandler.NewHandler(orderCacheService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()

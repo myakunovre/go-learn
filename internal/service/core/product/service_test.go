@@ -26,8 +26,9 @@ func TestProductService_Create(t *testing.T) {
 		logger *slog.Logger
 	}
 	type args struct {
-		name  string
-		price int
+		name   string
+		price  int
+		amount int
 	}
 	tests := []struct {
 		name    string
@@ -43,8 +44,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "Телефон",
-				price: 1000,
+				name:   "Телефон",
+				price:  1000,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: false,
@@ -56,8 +58,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "Телефон",
-				price: 1,
+				name:   "Телефон",
+				price:  1,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: false,
@@ -69,8 +72,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "N",
-				price: 1000,
+				name:   "N",
+				price:  1000,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: false,
@@ -82,8 +86,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "Nfkdlfmdsa;fmsalfmasl;fmlas;mlasmsam;asm;salmvlas;mvlasmvla;mva;mv;asmvlamva;s",
-				price: 1000,
+				name:   "Nfkdlfmdsa;fmsalfmasl;fmlas;mlasmsam;asm;salmvlas;mvlasmvla;mva;mv;asmvlamva;s",
+				price:  1000,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: false,
@@ -95,8 +100,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "",
-				price: 1000,
+				name:   "",
+				price:  1000,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: true,
@@ -108,8 +114,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "123",
-				price: -1000,
+				name:   "123",
+				price:  -1000,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: true,
@@ -121,8 +128,9 @@ func TestProductService_Create(t *testing.T) {
 				logger: logger,
 			},
 			args: args{
-				name:  "123",
-				price: 0,
+				name:   "123",
+				price:  0,
+				amount: 1,
 			},
 			want:    0,
 			wantErr: true,
@@ -133,8 +141,9 @@ func TestProductService_Create(t *testing.T) {
 			s := &ProductService{
 				repo:   tt.fields.repo,
 				logger: tt.fields.logger,
+				publisher:
 			}
-			got, err := s.Create(tt.args.name, tt.args.price)
+			got, err := s.Create(tt.args.name, tt.args.price, tt.args.amount)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
 				return

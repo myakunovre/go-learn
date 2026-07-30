@@ -1,19 +1,20 @@
 package events
 
 type ProductCreated struct {
-	ProductID int
+	ProductID int64
 	Name      string
-	Price     int
+	Price     int64
+	Amount    int64
 }
 
-func (e ProductCreated) GetType() string {
+func (e *ProductCreated) GetType() string {
 	return "product.created"
 }
 
 type ProductDeleted struct {
-	ProductID int
+	ProductID int64
 }
 
-func (e ProductDeleted) GetType() string {
+func (e *ProductDeleted) GetType() string {
 	return "product.deleted"
 }

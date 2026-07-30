@@ -1,6 +1,8 @@
 package events
 
-import "context"
+import (
+	"context"
+)
 
 // Event — базовый интерфейс для всех событий
 type Event interface {
@@ -10,4 +12,9 @@ type Event interface {
 // EventPublisher — интерфейс публикации событий
 type EventPublisher interface {
 	Publish(ctx context.Context, topic string, event Event) error
+}
+
+// EventConsumer — интерфейс потребления событий
+type EventConsumer interface {
+	Subscribe(ctx context.Context, topic string, event Event) error
 }

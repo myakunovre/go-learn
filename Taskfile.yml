@@ -131,3 +131,68 @@ tasks:
     desc: Показать справку
     cmds:
       - task --list
+
+  # ============ PROTOBUF ============
+
+  proto:
+    desc: Generate protobuf files
+    summary: |
+      Генерирует Go код из .proto файлов
+      Использует protoc с плагинами protoc-gen-go и protoc-gen-go-grpc
+    cmds:
+      - |
+        echo "🔧 Generating protobuf files..."
+        protoc \
+        --proto_path=proto \
+        --go_out=api/grpc/proto/pb \
+        --go_opt=paths=source_relative \
+        --go-grpc_out=api/grpc/proto/pb \
+        --go-grpc_opt=paths=source_relative \
+        api/grpc/proto/*.proto
+      - echo "✅ Protobuf generation completed!"
+    sources:
+      - '{{.PROTO_DIR}}/*.proto'
+    generates:
+      - '{{.PROTO_DIR}}/*.pb.go'
+      - '{{.PROTO_DIR}}/*_grpc.pb.go'
+
+  proto-clean:
+    desc: Clean generated protobuf files
+    summary: Удаляет все сгенерированные .pb.go файлы
+    cmds:
+      - echo "🧹 Cleaning generated files..."
+      - find {{.PROTO_DIR}} -name "*.pb.go" -type f -delete
+      - find {{.PROTO_DIR}} -name "*_grpc.pb.go" -type f -delete
+      - echo "✅ Cleaned!"
+    status:
+      - test -z "$(find {{.PROTO_DIR}} -name '*.pb.go' 2>/dev/null | head -1)"
+
+  proto-format:
+    desc: Format proto files
+    summary: Форматирует .proto файлы с помощью clang-format
+    cmds:
+      - echo "📝 Formatting proto files..."
+      - find {{.PROTO_DIR}} -name "*.proto" -exec clang-format -i {} \;
+      - echo "✅ Formatting completed!"
+    preconditions:
+      - sh: command -v clang-format
+        msg: "clang-format is not installed. Install with: brew install clang-format"
+
+  proto-all:
+    desc: Clean and regenerate protobuf
+    summary: Очищает и перегенерирует все protobuf файлы
+    cmds:
+      - task: proto-clean
+      - task: proto
+
+  proto-watch:
+    desc: Watch proto files and regenerate on change
+    summary: Следит за изменениями в .proto файлах и автоматически перегенерирует код
+    cmds:
+      - echo "👀 Watching proto files..."
+      - |
+        find {{.PROTO_DIR}} -name "*.proto" | \
+        entr -r sh -c "task proto"
+    preconditions:
+      - sh: command -v entr
+        msg: "entr is not installed. Install with: brew install entr"

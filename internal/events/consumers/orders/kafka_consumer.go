@@ -4,17 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"go-learn/internal/events"
+	"go-learn/internal/service/order"
 	"log/slog"
 
 	"github.com/segmentio/kafka-go"
 )
 
 type ProductConsumer struct {
-	reader *kafka.Reader
-	logger *slog.Logger
+	reader            *kafka.Reader
+	orderService      *order.OrderService
+	orderCacheService *order.OrderCacheService
+	logger            *slog.Logger
 }
 
-func NewProductConsumer(brokers []string, logger *slog.Logger) *ProductConsumer {
+func NewProductConsumer(brokers []string, orderService *order.OrderService, orderCacheService *order.OrderCacheService, logger *slog.Logger) *ProductConsumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     brokers,
 		Topic:       "product-events",
@@ -25,8 +28,10 @@ func NewProductConsumer(brokers []string, logger *slog.Logger) *ProductConsumer 
 	})
 
 	return &ProductConsumer{
-		reader: reader,
-		logger: logger,
+		reader:            reader,
+		orderService:      orderService,
+		orderCacheService: orderCacheService,
+		logger:            logger,
 	}
 }
 
@@ -61,7 +66,18 @@ func (c *ProductConsumer) handleMessage(msg kafka.Message) {
 			return
 		}
 		c.logger.Info("Product deleted event received", "product_id", event.ProductID)
-		// Здесь можно очистить кэш заказов для удаленного продукта
+
+		// Помечаем удаленный товар в DB Order-сервиса
+		err := c.orderService.MarkDeletedProduct(int(event.ProductID))
+		if err != nil {
+			c.logger.Error("Failed to mark deleted product", "error", err)
+		}
+
+		// Очищаем кэш заказов для удаленного продукта
+		err = c.orderCacheService.DeleteProduct(context.Background(), event.ProductID)
+		if err != nil {
+			c.logger.Error("Failed to delete product from OrderCache", "error", err)
+		}
 
 	default:
 		c.logger.Warn("Unknown event type", "key", string(msg.Key))

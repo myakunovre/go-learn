@@ -1,54 +1,101 @@
 package order
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"go-learn/models"
 	"log/slog"
 )
 
-type OrderCacheInterface interface {
-	IncrementOrder(ctx context.Context, productID int) (int64, error)
-	GetOrder(ctx context.Context, productID int) (int64, error)
+type OrderRepository interface {
+	CreateOrder(description string, userId int, products map[int]int) (int, error)
+	GetOrder(id int) (*models.Order, error)
+	DeleteOrder(id int) error
+	MarkDeletedProduct(productId int) error
 }
 
 type OrderService struct {
-	repo   OrderCacheInterface
+	repo   OrderRepository
 	logger *slog.Logger
 }
 
-func NewOrderService(repo OrderCacheInterface, logger *slog.Logger) *OrderService {
-	return &OrderService{repo: repo, logger: logger}
+func NewOrderService(repo OrderRepository, logger *slog.Logger) *OrderService {
+	return &OrderService{
+		repo:   repo,
+		logger: logger,
+	}
 }
 
-func (s *OrderService) BuyProduct(ctx context.Context, productID int) (int64, error) {
-	if productID <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return 0, errors.New("product id should be greater than zero")
+func (s *OrderService) Create(description string, userId int, products map[int]int) (int, error) {
+	if len(description) == 0 {
+		s.logger.Error("[OrderService] Order description is blank", "description", description)
+		return 0, errors.New("order description is blank")
 	}
 
-	totalOrders, err := s.repo.IncrementOrder(ctx, productID)
+	if userId <= 0 {
+		s.logger.Error("[OrderService] userId less than zero", "userId", userId)
+		return 0, errors.New("userId less than zero")
+	}
+
+	if len(products) == 0 {
+		s.logger.Error("[OrderService] No products in order")
+		return 0, errors.New("no products in order")
+	}
+
+	id, err := s.repo.CreateOrder(description, userId, products)
 	if err != nil {
-		s.logger.Error("[OrderService] Error increment order for product", "id", productID, "err", err)
-		return 0, fmt.Errorf("failed to increment order: %w", err)
+		s.logger.Error("[OrderService] Error of creating order", "description", description, "error", err)
+		return 0, fmt.Errorf("order creation failed: %w", err)
 	}
 
-	s.logger.Info("[OrderService] Success increment order for product", "id", productID)
-	return totalOrders, nil
+	s.logger.Info("[OrderService] ✅ Order created successfully", "id", id, "description", description, "userId", userId)
+	return id, nil
 }
 
-func (s *OrderService) GetOrderCount(ctx context.Context, productID int) (int64, error) {
-	if productID <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return 0, errors.New("product id should be greater than zero")
+func (s *OrderService) Get(id int) (*models.Order, error) {
+	if id <= 0 {
+		s.logger.Warn("order id should be greater than zero")
+		return nil, errors.New("order id should be greater than zero")
 	}
 
-	count, err := s.repo.GetOrder(ctx, productID)
+	order, err := s.repo.GetOrder(id)
 	if err != nil {
-		s.logger.Error("[OrderService] Error get order count", "id", productID, "err", err)
-		return 0, fmt.Errorf("failed to get order: %w", err)
+		s.logger.Error("[OrderService] Error of getting order", "id", id, "error", err)
+		return nil, fmt.Errorf("order get failed: %w", err)
 	}
 
-	s.logger.Info("[OrderService] Success get order count", "id", productID)
-	return count, nil
+	s.logger.Info("[OrderService] ✅ Order got successful", "id", id, "description", order.Description)
+	return order, nil
+}
+
+func (s *OrderService) Delete(id int) error {
+	if id <= 0 {
+		s.logger.Warn("order id should be greater than zero")
+		return errors.New("order id should be greater than zero")
+	}
+
+	err := s.repo.DeleteOrder(id)
+	if err != nil {
+		s.logger.Error("[OrderService] Error of deleting order", "id", id, "error", err)
+		return fmt.Errorf("failed to delete order with id %d: %w", id, err)
+	}
+
+	s.logger.Info("[OrderService] ✅ Order deleted successfully", "id", id)
+	return nil
+}
+
+// MarkDeletedProduct маркирует удаленные товары во всех заказах (order_items)
+func (s *OrderService) MarkDeletedProduct(productId int) error {
+	if productId <= 0 {
+		s.logger.Warn("product id should be greater than zero")
+		return errors.New("product id should be greater than zero")
+	}
+
+	err := s.repo.MarkDeletedProduct(productId)
+	if err != nil {
+		s.logger.Error("[OrderService] Error marking product", "productId", productId, "error", err)
+		return fmt.Errorf("failed to mark deleted product with id %d: %w", productId, err)
+	}
+
+	return nil
 }
