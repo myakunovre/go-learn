@@ -197,7 +197,7 @@ func createTestProduct(t *testing.T, name string, price int) (int, *ProductRepos
 
 	id, err := repo.CreateProduct(name, price)
 	if err != nil {
-		t.Fatalf("Failed to create product: %v", err)
+		t.Fatalf("Failed to create core: %v", err)
 	}
 
 	return id, repo
@@ -216,7 +216,7 @@ func TestProductRepository_CreateProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Create simple product",
+			name: "Create simple core",
 			args: args{
 				name:  " Test Product",
 				price: 100,
@@ -224,7 +224,7 @@ func TestProductRepository_CreateProduct(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Create product with zero price",
+			name: "Create core with zero price",
 			args: args{
 				name:  "Free Product",
 				price: 0,
@@ -232,7 +232,7 @@ func TestProductRepository_CreateProduct(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Create product with blank name",
+			name: "Create core with blank name",
 			args: args{
 				name:  "",
 				price: 100,
@@ -257,11 +257,11 @@ func TestProductRepository_CreateProduct(t *testing.T) {
 			}
 
 			if product.Name != tt.args.name {
-				t.Errorf("CreateProduct() got product name %v, want %v", product.Name, tt.args.name)
+				t.Errorf("CreateProduct() got core name %v, want %v", product.Name, tt.args.name)
 			}
 
 			if product.Price != tt.args.price {
-				t.Errorf("CreateProduct() got product price %v, want %v", product.Price, tt.args.price)
+				t.Errorf("CreateProduct() got core price %v, want %v", product.Price, tt.args.price)
 			}
 		})
 	}
@@ -278,7 +278,7 @@ func TestProductRepository_GetProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Get existing product",
+			name: "Get existing core",
 			args: args{
 				id: 0, // Будет заменен при создании
 			},
@@ -289,7 +289,7 @@ func TestProductRepository_GetProduct(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Get non-existing product",
+			name: "Get non-existing core",
 			args: args{
 				id: 99999,
 			},
@@ -320,10 +320,10 @@ func TestProductRepository_GetProduct(t *testing.T) {
 
 			if !tt.wantErr {
 				if got.Name != tt.want.Name {
-					t.Errorf("GetProduct() got product name %v, want %v", got.Name, tt.want.Name)
+					t.Errorf("GetProduct() got core name %v, want %v", got.Name, tt.want.Name)
 				}
 				if got.Price != tt.want.Price {
-					t.Errorf("GetProduct() got product price %v, want %v", got.Price, tt.want.Price)
+					t.Errorf("GetProduct() got core price %v, want %v", got.Price, tt.want.Price)
 				}
 			}
 		})
@@ -372,21 +372,21 @@ func TestProductRepository_DeleteProduct(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Delete product Success",
+			name: "Delete core Success",
 			args: args{
 				id: 0,
 			},
 			wantErr: false,
 		},
 		{
-			name: "Delete product with non-existing product",
+			name: "Delete core with non-existing core",
 			args: args{
 				id: 1000,
 			},
 			wantErr: true,
 		},
 		{
-			name: "Try to delete product with negative ID",
+			name: "Try to delete core with negative ID",
 			args: args{
 				id: -1,
 			},
@@ -417,7 +417,7 @@ func TestProductRepository_DeleteProduct(t *testing.T) {
 			if !tt.wantErr {
 				_, err = repo.GetProduct(targetID)
 				if err == nil {
-					t.Errorf("DeleteProduct() product still exists")
+					t.Errorf("DeleteProduct() core still exists")
 				}
 			}
 		})

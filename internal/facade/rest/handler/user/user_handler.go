@@ -2,7 +2,7 @@ package user
 
 import (
 	"fmt"
-	"go-learn/internal/facade/rest/handler/models"
+	"go-learn/internal/facade/rest/handler/models/core"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +25,7 @@ func NewHandler(userService UserService, logger *slog.Logger) *Handler {
 func (h *Handler) CreateUser(c *gin.Context) {
 	h.logger.Info("Called CreateUser")
 
-	var req models.CreateUserRequest
+	var req core.CreateUserRequest
 
 	// Привязываем JSON к структуре
 	if err := c.ShouldBindJSON(&req); err != nil {

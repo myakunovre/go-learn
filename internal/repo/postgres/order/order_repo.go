@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go-learn/internal/domain/order"
 	"go-learn/models"
 	"log/slog"
 )
@@ -20,7 +21,7 @@ func NewOrderRepository(db *sql.DB, logger *slog.Logger) *OrderRepository {
 	}
 }
 
-func (r *OrderRepository) CreateOrder(description string, userId int, products map[int]int) (int, error) {
+func (r *OrderRepository) CreateOrder(description string, userId int, products []order.Product) (int, error) {
 	r.logger.Debug("[OrderRepository] Creating order", "description", description, "userId", userId)
 
 	// Создаем транзакцию, т.к. добавляем данные в две таблицы
@@ -33,7 +34,7 @@ func (r *OrderRepository) CreateOrder(description string, userId int, products m
 
 	// добавление в таблицу orders
 	var orderId int
-	err = r.db.QueryRow(
+	err = tx.QueryRow(
 		"INSERT INTO orders (description, user_id) VALUES ($1, $2) RETURNING id", description, userId,
 	).Scan(&orderId)
 
@@ -43,20 +44,14 @@ func (r *OrderRepository) CreateOrder(description string, userId int, products m
 	}
 
 	// добавление в таблицу order_items
-	for productId, amount := range products {
-
-		// todo
-		// Получаем информацию о товаре из core-сервиса (через gRPC)
-		// Пока используем заглушку
-		productName := fmt.Sprintf("product_%d", productId) // заглушка Name
-		productPrice := 100                                 // заглушка Price
+	for _, product := range products {
 
 		_, err := tx.Exec(
-			"INSERT INTO order_items (order_id, product_id, product_name, product_amount, product_price) VALUES ($1, $2, $3, $4, $5)",
-			orderId, productId, productName, amount, productPrice,
+			"INSERT INTO order_items (order_id, product_id, product_name, product_amount_in_core, product_amount_in_order, product_price) VALUES ($1, $2, $3, $4, $5)",
+			orderId, product.ProductId, product.ProductName, product.ProductAmountInCore, product.ProductAmountInOrder, product.ProductPrice,
 		)
 		if err != nil {
-			r.logger.Error("[OrderRepository] Failed to create order_item", "productId", productId, "err", err)
+			r.logger.Error("[OrderRepository] Failed to create order_item", "productId", product.ProductId, "err", err)
 			return 0, fmt.Errorf("failed to create order_item: %w", err)
 		}
 	}
@@ -117,14 +112,14 @@ func (r *OrderRepository) DeleteOrder(id int) error {
 }
 
 func (r *OrderRepository) MarkDeletedProduct(productId int) error {
-	r.logger.Debug("[OrderRepository] Marking Deleted product", "productId", productId)
+	r.logger.Debug("[OrderRepository] Marking Deleted core", "productId", productId)
 
 	_, err := r.db.Exec(
 		"UPDATE order_items SET item_exists = false WHERE product_id = $1", productId,
 	)
 	if err != nil {
-		r.logger.Error("[OrderRepository] Failed to mark product as deleted", "productId", productId)
-		return fmt.Errorf("failed to mark product as deleted: %w", err)
+		r.logger.Error("[OrderRepository] Failed to mark core as deleted", "productId", productId)
+		return fmt.Errorf("failed to mark core as deleted: %w", err)
 	}
 
 	r.logger.Info("[OrderRepository] Product marked as deleted", "productId", productId)

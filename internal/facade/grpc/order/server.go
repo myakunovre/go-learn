@@ -12,7 +12,7 @@ import (
 )
 
 type OrderGRPCServer struct {
-	*pb.UnimplementedOrderServiceServer
+	pb.UnimplementedOrderServiceServer
 	orderService      *order.OrderService
 	orderCacheService *order.OrderCacheService
 	logger            *slog.Logger
@@ -30,16 +30,16 @@ func (s *OrderGRPCServer) GetBookedProducts(context context.Context, req *pb.Get
 
 	bookedProducts, err := s.orderCacheService.GetAllProducts(context)
 	if err != nil {
-		s.logger.Error("[gRPC OrderService] Error of getting booked product", "error", err)
-		return nil, fmt.Errorf("product get failed: %w", err)
+		s.logger.Error("[gRPC OrderService] Error of getting booked core", "error", err)
+		return nil, fmt.Errorf("core get failed: %w", err)
 	}
 
-	// Преобразуем полученную мапу bookedProducts в слайс *pb. BookedProduct
+	// Преобразуем полученный слайс bookedProducts в слайс *pb.BookedProduct
 	var result []*pb.BookedProduct
-	for _, productID := range bookedProducts {
+	for _, bookedProduct := range bookedProducts {
 		prod := &pb.BookedProduct{
-			ProductId: productID,
-			Amount:    int32(bookedProducts[productID]),
+			ProductId: int64(bookedProduct.ProductId),
+			Amount:    int32(bookedProduct.Quantity),
 		}
 		result = append(result, prod)
 	}

@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
-	serverPort := getEnv("SERVER_PORT", "8080")
+	serverPort := getEnv("CORE_SERVER_PORT", "8080")
 	//Postgres
 	dbUser := getEnv("CORE_DB_USER", "user")
 	dbPass := getEnv("CORE_DB_PASSWORD", "password")
@@ -115,7 +115,7 @@ func main() {
 
 	// === НАКАТЫВАЕМ МИГРАЦИЮ
 	goose.SetBaseFS(migrations.CoreMigrationsFS)
-	if err := goose.Up(db, "."); err != nil {
+	if err := goose.Up(db, "core"); err != nil {
 		logger.Error("Ошибка миграции", "error", err)
 		os.Exit(1)
 	}
@@ -146,6 +146,8 @@ func main() {
 
 	// Запуск GRPC-сервера
 	productGRPCServer := core.NewProductGRPCServer(productService, logger)
+
+	// todo: добавить gRPC клиент для запросов в order
 
 	go func() {
 		if err := productGRPCServer.Start(grpcPort); err != nil {

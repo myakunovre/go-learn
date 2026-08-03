@@ -15,7 +15,8 @@ type ProductRepository interface {
 	DeleteProductWithTransaction(tx *sql.Tx, id int64) error
 	CreateProduct(name string, price, amount int64) (int64, error)
 	AddProduct(id, amount int64) (int64, error)
-	GetProduct(int64) (*models.Product, error)
+	GetProduct(id int64) (*models.Product, error)
+	GetProductsByIDs(ids []int64) ([]*models.Product, error)
 	GetAllProducts() ([]models.Product, error)
 	NewTransaction(ctx context.Context) (*sql.Tx, error)
 }
@@ -42,7 +43,7 @@ func (s *ProductService) Create(ctx context.Context, name string, price, amount 
 
 	if len(name) == 0 {
 		s.logger.Error("[ProductService] Product name id blank", "name", name)
-		return 0, errors.New("product name is blank")
+		return 0, errors.New("core name is blank")
 	}
 
 	if amount <= 0 {
@@ -52,8 +53,8 @@ func (s *ProductService) Create(ctx context.Context, name string, price, amount 
 
 	id, err := s.repo.CreateProduct(name, price, amount)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of creating product", "name", name, "error", err)
-		return 0, fmt.Errorf("product creation failed: %w", err)
+		s.logger.Error("[ProductService] Error of creating core", "name", name, "error", err)
+		return 0, fmt.Errorf("core creation failed: %w", err)
 	}
 
 	// Публикуем событие о создании товара через KAFKA
@@ -63,7 +64,7 @@ func (s *ProductService) Create(ctx context.Context, name string, price, amount 
 		Price:     price,
 		Amount:    amount,
 	}
-	if pubErr := s.publisher.Publish(ctx, "product-events", &event); pubErr != nil {
+	if pubErr := s.publisher.Publish(ctx, "core-events", &event); pubErr != nil {
 		s.logger.Warn("Failed to publish ProductCreated event", "error", pubErr)
 		// Не возвращаем ошибку, чтобы не нарушать основную операцию
 	}
@@ -74,25 +75,41 @@ func (s *ProductService) Create(ctx context.Context, name string, price, amount 
 
 func (s *ProductService) Get(id int64) (*models.Product, error) {
 	if id <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return nil, errors.New("product id should be greater than zero")
+		s.logger.Warn("core id should be greater than zero")
+		return nil, errors.New("core id should be greater than zero")
 	}
 
 	product, err := s.repo.GetProduct(id)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of getting product", "id", id, "error", err)
-		return nil, fmt.Errorf("product get failed: %w", err)
+		s.logger.Error("[ProductService] Error of getting core", "id", id, "error", err)
+		return nil, fmt.Errorf("core get failed: %w", err)
 	}
 
 	s.logger.Info("[ProductService] ✅ Product got successful", "id", id, "name", product.Name)
 	return product, nil
 }
 
+func (s *ProductService) GetProductsByIDs(ids []int64) ([]*models.Product, error) {
+	if len(ids) == 0 {
+		s.logger.Error("[ProductService] Products ids is empty")
+		return nil, errors.New("products ids is empty")
+	}
+
+	products, err := s.repo.GetProductsByIDs(ids)
+	if err != nil {
+		s.logger.Error("[ProductService] Error of getting products", "id", ids, "error", err)
+		return nil, fmt.Errorf("products get failed: %w", err)
+	}
+
+	s.logger.Info("[ProductService] ✅ Products got successful", "id", ids)
+	return products, nil
+}
+
 func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 	products, err := s.repo.GetAllProducts()
 	if err != nil {
 		s.logger.Error("[ProductService] Error of getting all products", "error", err)
-		return nil, fmt.Errorf("product get failed: %w", err)
+		return nil, fmt.Errorf("core get failed: %w", err)
 	}
 
 	s.logger.Info("[ProductService] All Products got successful", "num", len(products))
@@ -101,8 +118,8 @@ func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 
 func (s *ProductService) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return errors.New("product id should be greater than zero")
+		s.logger.Warn("core id should be greater than zero")
+		return errors.New("core id should be greater than zero")
 	}
 
 	tx, err := s.repo.NewTransaction(ctx)
@@ -112,14 +129,14 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 
 	err = s.repo.DeleteProductWithTransaction(tx, id)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of deleting product", "id", id, "error", err)
-		return fmt.Errorf("failed to delete product with id %d: %v", id, err)
+		s.logger.Error("[ProductService] Error of deleting core", "id", id, "error", err)
+		return fmt.Errorf("failed to delete core with id %d: %v", id, err)
 	}
 
 	//анализируем цену товара
 	product, err := s.repo.GetProduct(id)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of getting product", "id", id, "error", err)
+		s.logger.Error("[ProductService] Error of getting core", "id", id, "error", err)
 	}
 	price := product.Price
 
@@ -131,7 +148,7 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 
 	// Публикуем событие об удалении товара через KAFKA
 	event := events.ProductDeleted{ProductID: id}
-	pubErr := s.publisher.Publish(ctx, "product-events", &event)
+	pubErr := s.publisher.Publish(ctx, "core-events", &event)
 	if pubErr != nil {
 		s.logger.Warn("Failed to publish ProductDeleted event", "error", pubErr)
 	}
@@ -139,7 +156,7 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 	if price > 10000 {
 		if pubErr != nil {
 			tx.Rollback()
-			return fmt.Errorf("product delete failed: %w", pubErr)
+			return fmt.Errorf("core delete failed: %w", pubErr)
 		}
 	}
 
@@ -150,19 +167,19 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 
 func (s *ProductService) AddProduct(id, amount int64) (int64, error) {
 	if id <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return 0, errors.New("product id should be greater than zero")
+		s.logger.Warn("core id should be greater than zero")
+		return 0, errors.New("core id should be greater than zero")
 	}
 
 	if amount <= 0 {
-		s.logger.Warn("product amount should be greater than zero")
-		return 0, errors.New("product amount should be greater than zero")
+		s.logger.Warn("core amount should be greater than zero")
+		return 0, errors.New("core amount should be greater than zero")
 	}
 
 	newAmount, err := s.repo.AddProduct(id, amount)
 	if err != nil {
-		s.logger.Error("[ProductService] Error of adding product", "id", id, "error", err)
-		return 0, fmt.Errorf("product add failed: %w", err)
+		s.logger.Error("[ProductService] Error of adding core", "id", id, "error", err)
+		return 0, fmt.Errorf("core add failed: %w", err)
 	}
 
 	s.logger.Info("[ProductService] ✅ Product add successful", "id", id, "new amount", newAmount)

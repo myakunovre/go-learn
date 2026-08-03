@@ -34,15 +34,15 @@ func NewProductGRPCClient(addr string, logger *slog.Logger) (*ProductGRPCClient,
 	}, nil
 }
 
-func (c *ProductGRPCClient) GetProduct(ctx context.Context, productID int64) (*pb.ProductResponse, error) {
+func (c *ProductGRPCClient) GetProducts(ctx context.Context, productIDs []int64) (*pb.ProductResponse, error) {
 	req := &pb.GetProductRequest{
-		ProductId: productID,
+		ProductIds: productIDs,
 	}
 
-	resp, err := c.client.GetProduct(ctx, req)
+	resp, err := c.client.GetProducts(ctx, req)
 	if err != nil {
-		c.logger.Error("failed to get product from core service", "productID", productID, "error", err)
-		return nil, fmt.Errorf("failed to get product from core service: %w", err)
+		c.logger.Error("failed to get products from core service", "productIDs", productIDs, "error", err)
+		return nil, fmt.Errorf("failed to get core from core service: %w", err)
 	}
 
 	return resp, nil

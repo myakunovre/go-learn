@@ -5,12 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"go-learn/internal/events/consumers/orders"
-	authhandler "go-learn/internal/facade/rest/handler/auth"
+	"go-learn/internal/facade/grpc/core"
 	orderhandler "go-learn/internal/facade/rest/handler/order"
-	userrepo "go-learn/internal/repo/postgres/sesssion"
+	orderrepo "go-learn/internal/repo/postgres/order"
 	"go-learn/internal/repo/redis/order"
-	"go-learn/internal/repo/redis/session"
-	authservice "go-learn/internal/service/core/auth"
 	"go-learn/migrations"
 	"strings"
 
@@ -49,7 +47,7 @@ func main() {
 	}
 
 	// === ЗАГРУЗКА ПЕРЕМЕННЫХ ===
-	serverPort := getEnv("SERVER_PORT", "8080")
+	serverPort := getEnv("ORDER_SERVER_PORT", "8082")
 	//Postgres
 	dbUser := getEnv("ORDER_DB_USER", "user")
 	dbPass := getEnv("ORDER_DB_ORDER_PASSWORD", "password")
@@ -63,6 +61,8 @@ func main() {
 	redisPassword := getEnv("REDIS_PASSWORD", "")
 	//Kafka
 	kafkaBrokers := getEnv("KAFKA_BROKERS", "localhost:9092")
+	//GRPC
+	grpcPort := getEnv("CORE_GRPC_PORT", "50051")
 	//Graceful Shutdown
 	shutdownTimeout := getEnvInt("SHUTDOWN_TIMEOUT", 5)
 
@@ -111,7 +111,7 @@ func main() {
 
 	// === НАКАТЫВАЕМ МИГРАЦИЮ
 	goose.SetBaseFS(migrations.OrderMigrationsFS)
-	if err := goose.Up(db, "."); err != nil {
+	if err := goose.Up(db, "order"); err != nil {
 		logger.Error("Ошибка миграции", "error", err)
 		os.Exit(1)
 	}
@@ -119,25 +119,38 @@ func main() {
 
 	// === РЕПОЗИТОРИИ ===
 	//postgres
-	authRepo := userrepo.NewAuthRepository(db, logger)
+	orderRepo := orderrepo.NewOrderRepository(db, logger)
+	//authRepo := userrepo.NewAuthRepository(db, logger)
 	// redis
 	orderCacheRepo := order.NewOrderCacheRepository(redisClient, logger)
-	sessionCache := session.NewSessionCache(redisClient)
+	//sessionCache := session.NewSessionCache(redisClient)
+
+	// Запуск GRPC-клиента
+	productGRPCClient, err := core.NewProductGRPCClient(grpcPort, logger)
+	if err != nil {
+		logger.Error("Failed to create gRPC client", "error", err)
+		os.Exit(1)
+	}
+	defer productGRPCClient.Close()
+
+	// todo: добавить gRPC сервер для запросов от core
+
+	// === СЕРВИСЫ ===
+	orderService := orderservice.NewOrderService(orderRepo, productGRPCClient, logger)
+	orderCacheService := orderservice.NewOrderCacheService(orderCacheRepo, logger)
+	//authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
 	// === KAFKA CONSUMER ===
 	brokers := strings.Split(kafkaBrokers, ",")
-	productConsumer := orders.NewProductConsumer(brokers, orderCacheRepo, logger)
+	productConsumer := orders.NewProductConsumer(brokers, orderService, orderCacheService, logger)
 	defer productConsumer.Close()
 
 	ctx = context.Background()
 	productConsumer.Start(ctx)
 
-	// === СЕРВИСЫ ===
-	orderCacheService := orderservice.NewOrderCacheService(orderCacheRepo, logger)
-	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
-
 	// === ХЕНДЛЕР ===
-	h := orderhandler.NewHandler(orderCacheService, logger)
+	h := orderhandler.NewCacheHandler(orderCacheService, logger)
+	h1 := orderhandler.NewHandler(orderService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
@@ -148,12 +161,17 @@ func main() {
 	// Эндпоинт для Prometheus
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	// Публичные эндпоинты
+	router.POST("/buy/product/:id", h.BuyProduct)
+	router.GET("/product/:id/orders", h.GetCounts)
+	//todo: Добавить эндпоинты order-сервиса (нужна ли авторизация в этом сервисе?)
+
 	// Защищенные эндпоинты (требуют авторизацию)
-	auth := router.Group("/")
-	auth.Use(authhandler.AuthMiddleware(authService))
+	//auth := router.Group("/")
+	//auth.Use(authhandler.AuthMiddleware(authService))
 	{
-		auth.POST("/buy/product/:id", h.BuyProduct)
-		auth.GET("/product/:id/orders", h.GetCounts)
+		//auth.POST("/buy/core/:id", h.BuyProduct)
+		//auth.GET("/core/:id/orders", h.GetCounts)
 	}
 
 	// === GRACEFUL SHUTDOWN ===

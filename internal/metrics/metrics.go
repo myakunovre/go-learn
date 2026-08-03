@@ -50,7 +50,7 @@ func PrometheusMiddleware() gin.HandlerFunc {
 		// После ответа
 		duration := time.Since(start).Seconds()
 		status := strconv.Itoa(c.Writer.Status())
-		path := c.FullPath() // например, "/product/:id"
+		path := c.FullPath() // например, "/core/:id"
 		method := c.Request.Method
 
 		// Увеличиваем счётчик запросов

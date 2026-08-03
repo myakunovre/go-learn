@@ -54,7 +54,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	token := hex.EncodeToString(tokenBytes)
 
 	session := &models.Session{
-		UserID:    user.ID,
+		UserID:    int(user.ID),
 		Token:     token,
 		ExpiresAt: time.Now().Add(24 * time.Hour), // Токен живёт 24 часа
 	}
@@ -65,7 +65,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	}
 
 	// Кэшируем с TTL 30 секунд
-	if err := s.cache.SetSession(ctx, token, user.ID, 30*time.Second); err != nil {
+	if err := s.cache.SetSession(ctx, token, int(user.ID), 30*time.Second); err != nil {
 		s.logger.Warn("Failed to redis session", "error", err)
 	}
 

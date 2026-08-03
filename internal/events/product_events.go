@@ -8,7 +8,7 @@ type ProductCreated struct {
 }
 
 func (e *ProductCreated) GetType() string {
-	return "product.created"
+	return "core.created"
 }
 
 type ProductDeleted struct {
@@ -16,5 +16,5 @@ type ProductDeleted struct {
 }
 
 func (e *ProductDeleted) GetType() string {
-	return "product.deleted"
+	return "core.deleted"
 }

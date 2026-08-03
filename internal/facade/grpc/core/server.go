@@ -12,7 +12,7 @@ import (
 )
 
 type ProductGRPCServer struct {
-	*pb.UnimplementedProductServiceServer
+	pb.UnimplementedProductServiceServer
 	prodService *product.ProductService
 	logger      *slog.Logger
 }
@@ -24,20 +24,28 @@ func NewProductGRPCServer(prodService *product.ProductService, logger *slog.Logg
 	}
 }
 
-func (s *ProductGRPCServer) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.ProductResponse, error) {
-	id := req.GetProductId()
+func (s *ProductGRPCServer) GetProducts(ctx context.Context, req *pb.GetProductRequest) (*pb.ProductResponse, error) {
+	IDs := req.GetProductIds()
 
-	prod, err := s.prodService.Get(id)
+	products, err := s.prodService.GetProductsByIDs(IDs)
 	if err != nil {
-		s.logger.Error("[gRPC ProductService] Error of getting product", "id", id, "error", err)
-		return nil, fmt.Errorf("product get failed: %w", err)
+		s.logger.Error("[gRPC ProductService] Error of getting products", "id", IDs, "error", err)
+		return nil, fmt.Errorf("core get failed: %w", err)
+	}
+
+	var result []*pb.Product
+	for _, p := range products {
+		prod := &pb.Product{
+			Id:     p.ID,
+			Name:   p.Name,
+			Price:  p.Price,
+			Amount: p.Amount,
+		}
+		result = append(result, prod)
 	}
 
 	return &pb.ProductResponse{
-		Id:     prod.ID,
-		Name:   prod.Name,
-		Price:  prod.Price,
-		Amount: prod.Amount,
+		Products: result,
 	}, nil
 }
 

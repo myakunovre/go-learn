@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go-learn/models"
 	"log/slog"
+	"strings"
 )
 
 type ProductRepository struct {
@@ -22,7 +23,7 @@ func NewProductRepository(db *sql.DB, logger *slog.Logger) *ProductRepository {
 }
 
 func (r *ProductRepository) CreateProduct(name string, price, amount int64) (int64, error) {
-	r.logger.Debug("[ProductRepository] Creating product", "name", name, "price", price, "amount", amount)
+	r.logger.Debug("[ProductRepository] Creating core", "name", name, "price", price, "amount", amount)
 
 	var id int64
 	err := r.db.QueryRow(
@@ -30,8 +31,8 @@ func (r *ProductRepository) CreateProduct(name string, price, amount int64) (int
 	).Scan(&id)
 
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to create product", "err", err)
-		return 0, fmt.Errorf("failed to create product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to create core", "err", err)
+		return 0, fmt.Errorf("failed to create core: %w", err)
 	}
 
 	r.logger.Info("[ProductRepository] Product created successfully", "id", id, "name", name, "price", price, "amount", amount)
@@ -39,7 +40,7 @@ func (r *ProductRepository) CreateProduct(name string, price, amount int64) (int
 }
 
 func (r *ProductRepository) AddProduct(id, amount int64) (int64, error) {
-	r.logger.Debug("[ProductRepository] Adding product", "id", id, "amount", amount)
+	r.logger.Debug("[ProductRepository] Adding core", "id", id, "amount", amount)
 
 	var curAmount int64
 	err := r.db.QueryRow(
@@ -48,11 +49,11 @@ func (r *ProductRepository) AddProduct(id, amount int64) (int64, error) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Warn("[ProductRepository] Product not found", "id", id)
-			return 0, fmt.Errorf("product with id %d not found", id)
+			return 0, fmt.Errorf("core with id %d not found", id)
 		}
 
-		r.logger.Error("[ProductRepository] Failed to get product", "id", id, "err", err)
-		return 0, fmt.Errorf("failed to get product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to get core", "id", id, "err", err)
+		return 0, fmt.Errorf("failed to get core: %w", err)
 	}
 
 	newAmount := curAmount + amount
@@ -62,8 +63,8 @@ func (r *ProductRepository) AddProduct(id, amount int64) (int64, error) {
 	).Scan(&newAmount)
 
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to add product", "id", id, "err", err)
-		return 0, fmt.Errorf("failed to add product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to add core", "id", id, "err", err)
+		return 0, fmt.Errorf("failed to add core: %w", err)
 	}
 
 	r.logger.Info("[ProductRepository] Product added successfully", "id", id, "amount", amount)
@@ -71,7 +72,7 @@ func (r *ProductRepository) AddProduct(id, amount int64) (int64, error) {
 }
 
 func (r *ProductRepository) GetProduct(id int64) (*models.Product, error) {
-	r.logger.Debug("[ProductRepository] Getting product", "id", id)
+	r.logger.Debug("[ProductRepository] Getting core", "id", id)
 
 	var product models.Product
 	err := r.db.QueryRow(
@@ -81,15 +82,59 @@ func (r *ProductRepository) GetProduct(id int64) (*models.Product, error) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			r.logger.Warn("[ProductRepository] Product not found", "id", id)
-			return nil, fmt.Errorf("product with id %d not found", id)
+			return nil, fmt.Errorf("core with id %d not found", id)
 		}
 
-		r.logger.Error("[ProductRepository] Failed to get product", "id", id, "err", err)
-		return nil, fmt.Errorf("failed to get product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to get core", "id", id, "err", err)
+		return nil, fmt.Errorf("failed to get core: %w", err)
 	}
 
 	r.logger.Info("[ProductRepository] Product found successfully", "id", id, "name", product.Name)
 	return &product, nil
+}
+
+func (r *ProductRepository) GetProductsByIDs(ids []int64) ([]*models.Product, error) {
+	r.logger.Debug("[ProductRepository] Getting products", "id", ids)
+
+	if len(ids) == 0 {
+		r.logger.Debug("[ProductRepository] No products found")
+		return []*models.Product{}, nil
+	}
+
+	// Создаем плейсхолдеры для каждого ID
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	// Формируем финальный запрос
+	query := fmt.Sprintf("SELECT * FROM products WHERE id IN (%s)", strings.Join(placeholders, ","))
+
+	// Выполняем запрос с параметрами
+	row, err := r.db.Query(query, args...)
+	if err != nil {
+		r.logger.Error("[ProductRepository] Failed to query products", "id", ids, "err", err)
+		return nil, fmt.Errorf("failed to query products: %w", err)
+	}
+	defer row.Close()
+
+	// Сканируем результаты
+	var products []*models.Product
+	for row.Next() {
+		var product models.Product
+		err = row.Scan(&product.ID, &product.Name, &product.Price, &product.Amount)
+		if err != nil {
+			r.logger.Error("[ProductRepository] Failed to scan core", "id", ids, "err", err)
+			return nil, fmt.Errorf("failed to scan core: %w", err)
+		}
+		products = append(products, &product)
+	}
+
+	r.logger.Info("[ProductRepository] Products found successfully", "id", ids)
+	return products, nil
+
 }
 
 func (r *ProductRepository) GetAllProducts() ([]models.Product, error) {
@@ -106,14 +151,14 @@ func (r *ProductRepository) GetAllProducts() ([]models.Product, error) {
 	for rows.Next() {
 		var product models.Product
 		if err := rows.Scan(&product.ID, &product.Name, &product.Price, &product.Amount); err != nil {
-			r.logger.Error("[ProductRepository] Failed to scan product row", "error", err)
-			return nil, fmt.Errorf("failed to scan product: %w", err)
+			r.logger.Error("[ProductRepository] Failed to scan core row", "error", err)
+			return nil, fmt.Errorf("failed to scan core: %w", err)
 		}
 		products = append(products, product)
 	}
 
 	if err = rows.Err(); err != nil {
-		r.logger.Error("[ProductRepository] Error iterating product rows", "error", err)
+		r.logger.Error("[ProductRepository] Error iterating core rows", "error", err)
 		return nil, fmt.Errorf("error iterating products: %w", err)
 	}
 
@@ -122,23 +167,23 @@ func (r *ProductRepository) GetAllProducts() ([]models.Product, error) {
 }
 
 func (r *ProductRepository) DeleteProduct(id int64) error {
-	r.logger.Debug("[ProductRepository] Deleting product]", "id", id)
+	r.logger.Debug("[ProductRepository] Deleting core]", "id", id)
 
 	result, err := r.db.Exec("DELETE FROM products WHERE id = $1", id)
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
-		return fmt.Errorf("failed to delete product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
+		return fmt.Errorf("failed to delete core: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
+		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
 		return fmt.Errorf("failed to check rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
-		r.logger.Warn("[ProductRepository] No product found to delete", "id", id)
-		return fmt.Errorf("no product found with id %d", id)
+		r.logger.Warn("[ProductRepository] No core found to delete", "id", id)
+		return fmt.Errorf("no core found with id %d", id)
 	}
 
 	r.logger.Info("[ProductRepository] Product deleted successfully", "id", id)
@@ -146,23 +191,23 @@ func (r *ProductRepository) DeleteProduct(id int64) error {
 }
 
 func (r *ProductRepository) DeleteProductWithTransaction(tx *sql.Tx, id int64) error {
-	r.logger.Debug("[ProductRepository] Deleting product]", "id", id)
+	r.logger.Debug("[ProductRepository] Deleting core]", "id", id)
 
 	result, err := tx.Exec("DELETE FROM products WHERE id = $1", id)
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
-		return fmt.Errorf("failed to delete product: %w", err)
+		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
+		return fmt.Errorf("failed to delete core: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		r.logger.Error("[ProductRepository] Failed to delete product", "id", id, "err", err)
+		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
 		return fmt.Errorf("failed to check rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
-		r.logger.Warn("[ProductRepository] No product found to delete", "id", id)
-		return fmt.Errorf("no product found with id %d", id)
+		r.logger.Warn("[ProductRepository] No core found to delete", "id", id)
+		return fmt.Errorf("no core found with id %d", id)
 	}
 
 	r.logger.Info("[ProductRepository] Product deleted successfully", "id", id)

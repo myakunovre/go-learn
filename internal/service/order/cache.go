@@ -11,7 +11,8 @@ type OrderCacheRepository interface {
 	IncrementOrder(ctx context.Context, productID int64) (int64, error)
 	GetOrder(ctx context.Context, productID int64) (int64, error)
 	DeleteProductFromOrder(ctx context.Context, productID int64) error
-	GetAllOrders(ctx context.Context) (map[int64]int64, error)
+	//GetAllOrders(ctx context.Context) (map[int64]int64, error)
+	GetAllOrders(ctx context.Context) ([]OrderProduct, error)
 }
 
 type OrderCacheService struct {
@@ -25,24 +26,24 @@ func NewOrderCacheService(repo OrderCacheRepository, logger *slog.Logger) *Order
 
 func (s *OrderCacheService) BuyProduct(ctx context.Context, productID int64) (int64, error) {
 	if productID <= 0 {
-		s.logger.Warn("product id should be greater than zero")
-		return 0, errors.New("product id should be greater than zero")
+		s.logger.Warn("core id should be greater than zero")
+		return 0, errors.New("core id should be greater than zero")
 	}
 
 	totalOrders, err := s.repo.IncrementOrder(ctx, productID)
 	if err != nil {
-		s.logger.Error("[OrderCacheService] Error increment order for product", "id", productID, "err", err)
+		s.logger.Error("[OrderCacheService] Error increment order for core", "id", productID, "err", err)
 		return 0, fmt.Errorf("failed to increment order: %w", err)
 	}
 
-	s.logger.Info("[OrderCacheService] Success increment order for product", "id", productID)
+	s.logger.Info("[OrderCacheService] Success increment order for core", "id", productID)
 	return totalOrders, nil
 }
 
 func (s *OrderCacheService) GetOrderCount(ctx context.Context, productID int64) (int64, error) {
 	if productID <= 0 {
 		s.logger.Warn("[OrderCacheService] Product id should be greater than zero")
-		return 0, errors.New("product id should be greater than zero")
+		return 0, errors.New("core id should be greater than zero")
 	}
 
 	count, err := s.repo.GetOrder(ctx, productID)
@@ -58,20 +59,21 @@ func (s *OrderCacheService) GetOrderCount(ctx context.Context, productID int64) 
 func (s *OrderCacheService) DeleteProduct(ctx context.Context, productID int64) error {
 	if productID <= 0 {
 		s.logger.Warn("[OrderCacheService] Product id should be greater than zero")
-		return errors.New("product id should be greater than zero")
+		return errors.New("core id should be greater than zero")
 	}
 
 	err := s.repo.DeleteProductFromOrder(ctx, productID)
 	if err != nil {
-		s.logger.Error("[OrderCacheService] Error delete product", "id", productID, "err", err)
-		return fmt.Errorf("failed to delete product: %w", err)
+		s.logger.Error("[OrderCacheService] Error delete core", "id", productID, "err", err)
+		return fmt.Errorf("failed to delete core: %w", err)
 	}
 
-	s.logger.Info("[OrderCacheService] Success delete product", "id", productID)
+	s.logger.Info("[OrderCacheService] Success delete core", "id", productID)
 	return nil
 }
 
-func (s *OrderCacheService) GetAllProducts(ctx context.Context) (map[int64]int64, error) {
+// func (s *OrderCacheService) GetAllProducts(ctx context.Context) (map[int64]int64, error) {
+func (s *OrderCacheService) GetAllProducts(ctx context.Context) ([]OrderProduct, error) {
 	products, err := s.repo.GetAllOrders(ctx)
 	if err != nil {
 		s.logger.Error("[OrderCacheService] Error get all products", "err", err)

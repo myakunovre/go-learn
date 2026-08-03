@@ -6,18 +6,22 @@ package product;
 
 // Запрос ORDER->CORE: нужен только ID товара
 message GetProductRequest {
-  int64 product_id = 1;
+  repeated int64 product_ids = 1;
 }
 
 // Ответ CORE->ORDER: все поля товара
-message ProductResponse {
+message Product {
   int64 id = 1;
   string name = 2;
   int64 price = 3;
   int64 amount = 4;
 }
 
+message ProductResponse {
+  repeated Product products = 1;
+}
+
 // Сервис для получения товара из core-сервиса
 service ProductService {
-  rpc GetProduct (GetProductRequest) returns (ProductResponse);
+  rpc GetProducts (GetProductRequest) returns (ProductResponse);
 }

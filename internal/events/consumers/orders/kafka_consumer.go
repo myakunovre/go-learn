@@ -20,7 +20,7 @@ type ProductConsumer struct {
 func NewProductConsumer(brokers []string, orderService *order.OrderService, orderCacheService *order.OrderCacheService, logger *slog.Logger) *ProductConsumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     brokers,
-		Topic:       "product-events",
+		Topic:       "core-events",
 		GroupID:     "order-service",
 		MinBytes:    10e3,
 		MaxBytes:    10e6,
@@ -36,7 +36,7 @@ func NewProductConsumer(brokers []string, orderService *order.OrderService, orde
 }
 
 func (c *ProductConsumer) Start(ctx context.Context) {
-	c.logger.Info("Starting Kafka consumer for product events")
+	c.logger.Info("Starting Kafka consumer for core events")
 
 	go func() {
 		for {
@@ -59,10 +59,10 @@ func (c *ProductConsumer) Start(ctx context.Context) {
 
 func (c *ProductConsumer) handleMessage(msg kafka.Message) {
 	switch string(msg.Key) {
-	case "product.deleted":
+	case "core.deleted":
 		var event events.ProductDeleted
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
-			c.logger.Error("Failed to unmarshal product.deleted", "error", err)
+			c.logger.Error("Failed to unmarshal core.deleted", "error", err)
 			return
 		}
 		c.logger.Info("Product deleted event received", "product_id", event.ProductID)
@@ -70,13 +70,13 @@ func (c *ProductConsumer) handleMessage(msg kafka.Message) {
 		// Помечаем удаленный товар в DB Order-сервиса
 		err := c.orderService.MarkDeletedProduct(int(event.ProductID))
 		if err != nil {
-			c.logger.Error("Failed to mark deleted product", "error", err)
+			c.logger.Error("Failed to mark deleted core", "error", err)
 		}
 
 		// Очищаем кэш заказов для удаленного продукта
 		err = c.orderCacheService.DeleteProduct(context.Background(), event.ProductID)
 		if err != nil {
-			c.logger.Error("Failed to delete product from OrderCache", "error", err)
+			c.logger.Error("Failed to delete core from OrderCache", "error", err)
 		}
 
 	default:

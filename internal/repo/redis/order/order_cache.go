@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go-learn/internal/service/order"
 	"log/slog"
 	"strconv"
 	"time"
@@ -66,7 +67,7 @@ func (r *OrderCacheRepository) GetOrder(ctx context.Context, productID int64) (i
 }
 
 func (r *OrderCacheRepository) DeleteProductFromOrder(ctx context.Context, productID int64) error {
-	r.logger.Debug("[OrderCache] Deleting product", "productID", productID)
+	r.logger.Debug("[OrderCache] Deleting core", "productID", productID)
 
 	key := fmt.Sprintf("product_id: %d", productID)
 	_, err := r.client.Get(ctx, key).Result()
@@ -76,20 +77,21 @@ func (r *OrderCacheRepository) DeleteProductFromOrder(ctx context.Context, produ
 		return nil
 	} else if err != nil {
 		r.logger.Error("[OrderCache] Error getting order", "productID", productID, "err", err)
-		return fmt.Errorf("failed to get order product: %w", err)
+		return fmt.Errorf("failed to get order core: %w", err)
 	}
 
 	_, err = r.client.Del(ctx, key).Result()
 	if err != nil {
-		r.logger.Error("[OrderCache] Error deleting product from order", "productID", productID, "err", err)
+		r.logger.Error("[OrderCache] Error deleting core from order", "productID", productID, "err", err)
 		return fmt.Errorf("failed to deleting order counter: %w", err)
 	}
 
-	r.logger.Info("[OrderCache] Success deleting product from order cache", "productID", productID)
+	r.logger.Info("[OrderCache] Success deleting core from order cache", "productID", productID)
 	return nil
 }
 
-func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) (map[int64]int64, error) {
+// func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) (map[int64]int64, error) {
+func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) ([]order.OrderProduct, error) {
 	r.logger.Debug("[OrderCache] GetAll orders count")
 
 	keys, err := r.client.Keys(ctx, "product_id: *").Result()
@@ -100,48 +102,74 @@ func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) (map[int64]int6
 
 	if len(keys) == 0 {
 		r.logger.Warn("[OrderCache] No products found in cache")
-		return make(map[int64]int64), nil
+		//return make(map[int64]int64), nil
+		return []order.OrderProduct{}, nil
 	}
 
-	values, err := r.client.MGet(ctx, keys...).Result()
-	if err != nil {
-		r.logger.Error("[OrderCache] Error getting values", "err", err)
-		return nil, fmt.Errorf("failed to get order values: %w", err)
-	}
-
-	orders := make(map[int64]int64, len(keys))
-
-	for i, key := range keys {
-		// Извлекаем productID из ключа "product_id: 123"
-		var productID int64
-		_, err = fmt.Sscanf(key, "product_id: %d", &productID)
+	var orderProducts []order.OrderProduct
+	for _, productIdStr := range keys {
+		quantityStr, err := r.client.Get(ctx, fmt.Sprintf("product_id: %d", productIdStr)).Result()
 		if err != nil {
-			r.logger.Error("[OrderCache] Error parsing key", "key", key, "err", err)
+			r.logger.Error("[OrderCache] Error getting quantity", "productID", productIdStr, "err", err)
 			continue
 		}
 
-		// Проверяем, что значение (count) не nil
-		if values[i] == nil {
-			r.logger.Warn("[OrderCache] Nil value for key", "key", key)
-			continue
-		}
-
-		// Преобразуем значение в int64
-		valueStr, ok := values[i].(string)
-		if !ok {
-			r.logger.Error("[OrderCache] Invalid value type for key", "key", key, "value", values[i])
-			continue
-		}
-
-		count, err := strconv.ParseInt(valueStr, 10, 64)
+		id, err := strconv.Atoi(productIdStr)
 		if err != nil {
-			r.logger.Warn("[OrderCache] Error parsing product count", "key", key, "value", values[i])
+			r.logger.Error("[OrderCache] Error parsing core id", "productID", productIdStr, "err", err)
 			continue
 		}
 
-		orders[productID] = count
+		quantity, err := strconv.Atoi(quantityStr)
+		if err != nil {
+			r.logger.Error("[OrderCache] Error parsing quantity", "productID", productIdStr, "err", err)
+		}
+
+		orderProducts = append(orderProducts, order.OrderProduct{
+			ProductId: id,
+			Quantity:  quantity,
+		})
 	}
 
-	r.logger.Info("[OrderCache] Success get all orders", "count", len(orders))
-	return orders, nil
+	//values, err := r.client.MGet(ctx, keys...).Result()
+	//if err != nil {
+	//	r.logger.Error("[OrderCache] Error getting values", "err", err)
+	//	return nil, fmt.Errorf("failed to get order values: %w", err)
+	//}
+	//
+	//orders := make(map[int64]int64, len(keys))
+	//
+	//for i, key := range keys {
+	//	// Извлекаем productID из ключа "product_id: 123"
+	//	var productID int64
+	//	_, err = fmt.Sscanf(key, "product_id: %d", &productID)
+	//	if err != nil {
+	//		r.logger.Error("[OrderCache] Error parsing key", "key", key, "err", err)
+	//		continue
+	//	}
+	//
+	//	// Проверяем, что значение (count) не nil
+	//	if values[i] == nil {
+	//		r.logger.Warn("[OrderCache] Nil value for key", "key", key)
+	//		continue
+	//	}
+	//
+	//	// Преобразуем значение в int64
+	//	valueStr, ok := values[i].(string)
+	//	if !ok {
+	//		r.logger.Error("[OrderCache] Invalid value type for key", "key", key, "value", values[i])
+	//		continue
+	//	}
+	//
+	//	count, err := strconv.ParseInt(valueStr, 10, 64)
+	//	if err != nil {
+	//		r.logger.Warn("[OrderCache] Error parsing core count", "key", key, "value", values[i])
+	//		continue
+	//	}
+	//
+	//	orders[productID] = count
+	//}
+
+	r.logger.Info("[OrderCache] Success get all orders", "count", len(orderProducts))
+	return orderProducts, nil
 }

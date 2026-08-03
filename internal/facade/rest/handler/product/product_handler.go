@@ -3,7 +3,7 @@ package product
 import (
 	"context"
 	"fmt"
-	models2 "go-learn/internal/facade/rest/handler/models"
+	models2 "go-learn/internal/facade/rest/handler/models/core"
 	"go-learn/models"
 	"log/slog"
 	"net/http"
@@ -45,17 +45,17 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 
 	if req.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "product name can not be empty",
+			"error": "core name can not be empty",
 		})
-		h.logger.Warn("product name can not be empty")
+		h.logger.Warn("core name can not be empty")
 		return
 	}
 
 	if req.Price <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "product price can not be less than zero",
+			"error": "core price can not be less than zero",
 		})
-		h.logger.Warn("product price can not be less than zero")
+		h.logger.Warn("core price can not be less than zero")
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *Handler) GetProductById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"product": product,
+		"core": product,
 	})
 
 	h.logger.Info("Product found successfully", "name", product.Name, "id", id)

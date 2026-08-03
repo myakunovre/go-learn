@@ -2,6 +2,8 @@ package migrations
 
 import "embed"
 
-//go:embed *.sql
+//go:embed core/*.sql
 var CoreMigrationsFS embed.FS
+
+//go:embed order/*.sql
 var OrderMigrationsFS embed.FS

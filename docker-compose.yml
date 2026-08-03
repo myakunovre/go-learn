@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   # База данных PostgreSQL (основная база)
   postgres:
     image: postgres:15-alpine
-    container_name: go-postgres
+    container_name: go-postgres-core
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -22,7 +20,7 @@ services:
   # База данных PostgreSQL (orderService)
   postgres_order:
     image: postgres:15-alpine
-    container_name: go-postgres
+    container_name: go-postgres-order
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -30,7 +28,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data_order  # Исправил имя тома
+      - postgres_order_data:/var/lib/postgresql/data  # Исправил имя тома
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U user" ]
       interval: 10s
@@ -69,4 +67,5 @@ services:
 # Объявляем томы на верхнем уровне
 volumes:
   postgres_data:
+  postgres_order_data:
   redis_data:

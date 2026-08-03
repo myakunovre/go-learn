@@ -1,4 +1,4 @@
-package models
+package core
 
 // CreateProductRequest Структура для входящих данных продукта
 type CreateProductRequest struct {
