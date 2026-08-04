@@ -56,7 +56,7 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 		return 0, errors.New("no orderProducts in order")
 	}
 
-	// todo: вытащить из core-сервиса продукты по id
+	// todo: проверить этот блок кода (получение товаров по gRPC из core-сервиса)
 	// Создаем слайс с ID товаров для запроса из core-сервиса по gRPC
 	productIDs := make([]int64, len(orderProducts))
 	quantities := make([]int64, len(orderProducts))
