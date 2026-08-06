@@ -58,11 +58,11 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 
 	// todo: проверить этот блок кода (получение товаров по gRPC из core-сервиса)
 	// Создаем слайс с ID товаров для запроса из core-сервиса по gRPC
-	productIDs := make([]int64, len(orderProducts))
-	quantities := make([]int64, len(orderProducts))
+	productIDs := make([]int64, 0, len(orderProducts))
+	//quantities := make([]int64, 0, len(orderProducts))
 	for _, product := range orderProducts {
 		productIDs = append(productIDs, int64(product.ProductId))
-		quantities = append(quantities, int64(product.Quantity))
+		//quantities = append(quantities, int64(product.Quantity))
 	}
 
 	// Получаем товары по ID из core-сервиса по gRPC
@@ -72,17 +72,26 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 		return 0, errors.New("fail to get products from core")
 	}
 
+	quantityMap := make(map[int64]int64)
+	for _, product := range orderProducts {
+		quantityMap[int64(product.ProductId)] = int64(product.Quantity)
+	}
+
 	// Получаем слайс Products из запроса
 	products := productsFromCore.GetProducts()
 
 	// Создаем слайс order.Product для отправки в OrderRepo
 	var productsToOrder []order.Product
-	for i, product := range products {
+	for _, product := range products {
+		quantity, exists := quantityMap[product.Id]
+		if !exists {
+			continue
+		}
 		productsToOrder = append(productsToOrder, order.Product{
 			ProductId:            product.Id,
 			ProductName:          product.Name,
 			ProductAmountInCore:  int32(product.Amount),
-			ProductAmountInOrder: int32(quantities[i]),
+			ProductAmountInOrder: int32(quantity),
 			ProductPrice:         int32(product.Price),
 			ItemExists:           true,
 		})

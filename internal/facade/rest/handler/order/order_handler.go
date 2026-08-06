@@ -82,7 +82,15 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		}
 	}
 
-	id, err := h.orderService.Create(c.Request.Context(), req.Description, int(req.UserId), req.Products)
+	orderProductsIn := make([]order2.OrderProduct, 0, len(req.Products))
+	for _, product := range req.Products {
+		orderProductsIn = append(orderProductsIn, order2.OrderProduct{
+			ProductId: int(product.ProductId),
+			Quantity:  product.Quantity,
+		})
+	}
+
+	id, err := h.orderService.Create(c.Request.Context(), req.Description, int(req.UserId), orderProductsIn)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

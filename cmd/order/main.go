@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"go-learn/internal/events/consumers/orders"
 	"go-learn/internal/facade/grpc/core"
+	auth2 "go-learn/internal/facade/rest/handler/auth"
 	orderhandler "go-learn/internal/facade/rest/handler/order"
 	orderrepo "go-learn/internal/repo/postgres/order"
 	"go-learn/internal/repo/redis/order"
+	"go-learn/internal/repo/redis/session"
+	authservice "go-learn/internal/service/core/auth"
 	"go-learn/migrations"
 	"strings"
 
@@ -120,10 +123,12 @@ func main() {
 	// === РЕПОЗИТОРИИ ===
 	//postgres
 	orderRepo := orderrepo.NewOrderRepository(db, logger)
-	//authRepo := userrepo.NewAuthRepository(db, logger)
+	// todo: для authRepo требуются userRepo. Но эта БД в core-сервисе.
+	// todo: как быть? Я же не могу в order-сервсие использовать БД core-сервиса
+	authRepo := userrepo.NewAuthRepository(db, logger)
 	// redis
 	orderCacheRepo := order.NewOrderCacheRepository(redisClient, logger)
-	//sessionCache := session.NewSessionCache(redisClient)
+	sessionCache := session.NewSessionCache(redisClient)
 
 	// Запуск GRPC-клиента
 	productGRPCClient, err := core.NewProductGRPCClient(grpcPort, logger)
@@ -138,7 +143,7 @@ func main() {
 	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, productGRPCClient, logger)
 	orderCacheService := orderservice.NewOrderCacheService(orderCacheRepo, logger)
-	//authService := authservice.NewAuthService(authRepo, sessionCache, logger)
+	authService := authservice.NewAuthService(authRepo, sessionCache, logger)
 
 	// === KAFKA CONSUMER ===
 	brokers := strings.Split(kafkaBrokers, ",")
@@ -149,8 +154,9 @@ func main() {
 	productConsumer.Start(ctx)
 
 	// === ХЕНДЛЕР ===
-	h := orderhandler.NewCacheHandler(orderCacheService, logger)
-	h1 := orderhandler.NewHandler(orderService, logger)
+	cacheHandler := orderhandler.NewCacheHandler(orderCacheService, logger)
+	orderHandler := orderhandler.NewHandler(orderService, logger)
+	authHandler := auth2.NewHandler(authService, logger)
 
 	// === НАСТРОЙКА РОУТЕРА ===
 	router := gin.Default()
@@ -161,21 +167,24 @@ func main() {
 	// Эндпоинт для Prometheus
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// Публичные эндпоинты
-	router.POST("/buy/product/:id", h.BuyProduct)
-	router.GET("/product/:id/orders", h.GetCounts)
+	// Публичные эндпоинты order cache
+	// todo: наверное надо POST убрать из REST API, т.к. вряд ли такой эндпоинт нужен клиенту?
+	// todo: как будто логично дергать метод BuyProduct в сервисном слое (из какого-то другого сервиса)
+	router.POST("/products/:id/buy", cacheHandler.BuyProduct)
+	router.GET("/products/:id/orders", cacheHandler.GetCounts)
 
+	// Публичные эндпоинты order DB
 	//todo: Проверить эндпоинты order-сервиса (нужна ли авторизация в этом сервисе?)
-	router.POST("/order/create", h1.CreateOrder)
-	router.GET("/order/:id", h1.GetOrderById)
-	router.DELETE("/product/:id", h1.DeleteOrderById)
+	router.GET("/orders/:id", orderHandler.GetOrderById)
+	router.POST("/login", authHandler.Login)
 
 	// Защищенные эндпоинты (требуют авторизацию)
-	//auth := router.Group("/")
-	//auth.Use(authhandler.AuthMiddleware(authService))
+	auth := router.Group("/")
+	auth.Use(auth2.AuthMiddleware(authService))
 	{
-		//auth.POST("/buy/core/:id", h.BuyProduct)
-		//auth.GET("/core/:id/orders", h.GetCounts)
+		auth.POST("/logout", authHandler.Logout)
+		auth.POST("/orders/create", orderHandler.CreateOrder)
+		auth.DELETE("/orders/:id", orderHandler.DeleteOrderById)
 	}
 
 	// === GRACEFUL SHUTDOWN ===

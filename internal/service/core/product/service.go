@@ -122,6 +122,12 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 		return errors.New("core id should be greater than zero")
 	}
 
+	// Получаем продукт перед удалением
+	product, err := s.repo.GetProduct(id)
+	if err != nil {
+		s.logger.Error("[ProductService] Error of getting core", "id", id, "error", err)
+	}
+
 	tx, err := s.repo.NewTransaction(ctx)
 	if err != nil {
 		s.logger.Error("[ProductService] Error of creating transaction", "id", id, "error", err)
@@ -130,17 +136,11 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 	err = s.repo.DeleteProductWithTransaction(tx, id)
 	if err != nil {
 		s.logger.Error("[ProductService] Error of deleting core", "id", id, "error", err)
-		return fmt.Errorf("failed to delete core with id %d: %v", id, err)
+		return fmt.Errorf("failed to delete core with id %d: %w", id, err)
 	}
 
-	//анализируем цену товара
-	product, err := s.repo.GetProduct(id)
-	if err != nil {
-		s.logger.Error("[ProductService] Error of getting core", "id", id, "error", err)
-	}
-	price := product.Price
-
-	if price < 1000 {
+	// Публикуем событие для всех продуктов, кроме дешёвых
+	if product.Price < 1000 {
 		s.logger.Info("[ProductService] ✅ Product deleted successfully", "id", id)
 		tx.Commit()
 		return nil
@@ -148,15 +148,15 @@ func (s *ProductService) Delete(ctx context.Context, id int64) error {
 
 	// Публикуем событие об удалении товара через KAFKA
 	event := events.ProductDeleted{ProductID: id}
-	pubErr := s.publisher.Publish(ctx, "core-events", &event)
-	if pubErr != nil {
-		s.logger.Warn("Failed to publish ProductDeleted event", "error", pubErr)
+	err = s.publisher.Publish(ctx, "core-events", &event)
+	if err != nil {
+		s.logger.Warn("Failed to publish ProductDeleted event", "error", err)
 	}
 
-	if price > 10000 {
-		if pubErr != nil {
+	if product.Price > 10000 {
+		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("core delete failed: %w", pubErr)
+			return fmt.Errorf("core delete failed: %w", err)
 		}
 	}
 

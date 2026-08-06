@@ -102,35 +102,51 @@ func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) ([]order.OrderP
 
 	if len(keys) == 0 {
 		r.logger.Warn("[OrderCache] No products found in cache")
-		//return make(map[int64]int64), nil
 		return []order.OrderProduct{}, nil
 	}
 
+	// Получаем все значения одним запросом
+	values, err := r.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		r.logger.Error("[OrderCache] Error getting values from redis", "err", err)
+		return nil, fmt.Errorf("failed to get order values: %w", err)
+	}
+
 	var orderProducts []order.OrderProduct
-	for _, productIdStr := range keys {
-		quantityStr, err := r.client.Get(ctx, fmt.Sprintf("product_id: %d", productIdStr)).Result()
+	for i, key := range keys {
+		// Парсим productID из ключа
+		var productId int64
+		_, err = fmt.Sscanf(key, "%d", &productId)
 		if err != nil {
-			r.logger.Error("[OrderCache] Error getting quantity", "productID", productIdStr, "err", err)
+			r.logger.Error("[OrderCache] Error parsing key", "key", key, "err", err)
 			continue
 		}
 
-		id, err := strconv.Atoi(productIdStr)
-		if err != nil {
-			r.logger.Error("[OrderCache] Error parsing core id", "productID", productIdStr, "err", err)
+		if values[i] == nil {
+			r.logger.Error("[OrderCache] Error parsing values", "key", key, "value", values[i])
 			continue
 		}
 
-		quantity, err := strconv.Atoi(quantityStr)
+		// Преобразуем значение в строку
+		valueStr, ok := values[i].(string)
+		if !ok {
+			r.logger.Error("[OrderCache] Error parsing value", "key", key, "value", values[i])
+			continue
+		}
+
+		// Преобразуем значение из строки в число
+		quantity, err := strconv.Atoi(valueStr)
 		if err != nil {
-			r.logger.Error("[OrderCache] Error parsing quantity", "productID", productIdStr, "err", err)
+			r.logger.Error("[OrderCache] Error parsing quantity", "key", key, "value", values[i])
+			continue
 		}
 
 		orderProducts = append(orderProducts, order.OrderProduct{
-			ProductId: id,
+			ProductId: int(productId),
 			Quantity:  quantity,
 		})
 	}
-
+	// todo: удалить закомментированный код
 	//values, err := r.client.MGet(ctx, keys...).Result()
 	//if err != nil {
 	//	r.logger.Error("[OrderCache] Error getting values", "err", err)
