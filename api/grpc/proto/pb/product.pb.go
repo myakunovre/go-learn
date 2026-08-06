@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.36.0--rc1
-// source: core.proto
+// source: product.proto
 
 package pb
 
@@ -183,7 +183,7 @@ var File_product_proto protoreflect.FileDescriptor
 
 const file_product_proto_rawDesc = "" +
 	"\n" +
-	"\rcore.proto\x12\acore\"4\n" +
+	"\rproduct.proto\x12\aproduct\"4\n" +
 	"\x11GetProductRequest\x12\x1f\n" +
 	"\vproduct_ids\x18\x01 \x03(\x03R\n" +
 	"productIds\"[\n" +
@@ -193,9 +193,9 @@ const file_product_proto_rawDesc = "" +
 	"\x05price\x18\x03 \x01(\x03R\x05price\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x03R\x06amount\"?\n" +
 	"\x0fProductResponse\x12,\n" +
-	"\bproducts\x18\x01 \x03(\v2\x10.core.ProductR\bproducts2U\n" +
+	"\bproducts\x18\x01 \x03(\v2\x10.product.ProductR\bproducts2U\n" +
 	"\x0eProductService\x12C\n" +
-	"\vGetProducts\x12\x1a.core.GetProductRequest\x1a\x18.core.ProductResponseB\x16Z\x14go-learn/api/grpc/pbb\x06proto3"
+	"\vGetProducts\x12\x1a.product.GetProductRequest\x1a\x18.product.ProductResponseB\x16Z\x14go-learn/api/grpc/pbb\x06proto3"
 
 var (
 	file_product_proto_rawDescOnce sync.Once
@@ -211,14 +211,14 @@ func file_product_proto_rawDescGZIP() []byte {
 
 var file_product_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_product_proto_goTypes = []any{
-	(*GetProductRequest)(nil), // 0: core.GetProductRequest
-	(*Product)(nil),           // 1: core.Product
-	(*ProductResponse)(nil),   // 2: core.ProductResponse
+	(*GetProductRequest)(nil), // 0: product.GetProductRequest
+	(*Product)(nil),           // 1: product.Product
+	(*ProductResponse)(nil),   // 2: product.ProductResponse
 }
 var file_product_proto_depIdxs = []int32{
-	1, // 0: core.ProductResponse.products:type_name -> core.Product
-	0, // 1: core.ProductService.GetProducts:input_type -> core.GetProductRequest
-	2, // 2: core.ProductService.GetProducts:output_type -> core.ProductResponse
+	1, // 0: product.ProductResponse.products:type_name -> product.Product
+	0, // 1: product.ProductService.GetProducts:input_type -> product.GetProductRequest
+	2, // 2: product.ProductService.GetProducts:output_type -> product.ProductResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

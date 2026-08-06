@@ -133,7 +133,7 @@ func main() {
 	}
 	defer productGRPCClient.Close()
 
-	// todo: добавить gRPC сервер для запросов от core
+	// todo: добавить gRPC сервер для запросов от core (сначала придумать зачем core-сервису забронированные товары)
 
 	// === СЕРВИСЫ ===
 	orderService := orderservice.NewOrderService(orderRepo, productGRPCClient, logger)
@@ -164,7 +164,11 @@ func main() {
 	// Публичные эндпоинты
 	router.POST("/buy/product/:id", h.BuyProduct)
 	router.GET("/product/:id/orders", h.GetCounts)
-	//todo: Добавить эндпоинты order-сервиса (нужна ли авторизация в этом сервисе?)
+
+	//todo: Проверить эндпоинты order-сервиса (нужна ли авторизация в этом сервисе?)
+	router.POST("/order/create", h1.CreateOrder)
+	router.GET("/order/:id", h1.GetOrderById)
+	router.DELETE("/product/:id", h1.DeleteOrderById)
 
 	// Защищенные эндпоинты (требуют авторизацию)
 	//auth := router.Group("/")

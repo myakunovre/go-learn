@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.36.0--rc1
-// source: core.proto
+// source: product.proto
 
 package pb
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductService_GetProducts_FullMethodName = "/core.ProductService/GetProducts"
+	ProductService_GetProducts_FullMethodName = "/product.ProductService/GetProducts"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -112,7 +112,7 @@ func _ProductService_GetProducts_Handler(srv interface{}, ctx context.Context, d
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ProductService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "core.ProductService",
+	ServiceName: "product.ProductService",
 	HandlerType: (*ProductServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -121,5 +121,5 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "core.proto",
+	Metadata: "product.proto",
 }
