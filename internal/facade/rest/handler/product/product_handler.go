@@ -13,11 +13,11 @@ import (
 )
 
 type ProductService interface {
-	Delete(ctx context.Context, id int64) error
 	Create(ctx context.Context, name string, price, amount int64) (int64, error)
-	Get(id int64) (*models.Product, error)
-	GetAllProducts() ([]models.Product, error)
-	AddProduct(id, amount int64) (int64, error)
+	Get(ctx context.Context, id int64) (*models.Product, error)
+	Delete(ctx context.Context, id int64) error
+	GetAllProducts(ctx context.Context) ([]models.Product, error)
+	AddProduct(ctx context.Context, id, amount int64) (int64, error)
 }
 
 type Handler struct {
@@ -100,7 +100,7 @@ func (h *Handler) GetProductById(c *gin.Context) {
 		return
 	}
 
-	product, err := h.productService.Get(int64(id))
+	product, err := h.productService.Get(c.Request.Context(), int64(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -119,7 +119,7 @@ func (h *Handler) GetProductById(c *gin.Context) {
 func (h *Handler) GetAllProducts(c *gin.Context) {
 	h.logger.Info("Called GetAllProducts")
 
-	products, err := h.productService.GetAllProducts()
+	products, err := h.productService.GetAllProducts(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -216,7 +216,7 @@ func (h *Handler) AddProduct(c *gin.Context) {
 		return
 	}
 
-	amount, err := h.productService.AddProduct(int64(id), int64(am))
+	amount, err := h.productService.AddProduct(c.Request.Context(), int64(id), int64(am))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

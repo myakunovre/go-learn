@@ -1,6 +1,7 @@
 package order
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -21,7 +22,7 @@ func NewOrderRepository(db *sql.DB, logger *slog.Logger) *OrderRepository {
 	}
 }
 
-func (r *OrderRepository) CreateOrder(description string, userId int, products []order.Product) (int, error) {
+func (r *OrderRepository) CreateOrder(ctx context.Context, description string, userId int, products []order.Product) (int, error) {
 	r.logger.Debug("[OrderRepository] Creating order", "description", description, "userId", userId)
 
 	// Создаем транзакцию, т.к. добавляем данные в две таблицы
@@ -65,7 +66,7 @@ func (r *OrderRepository) CreateOrder(description string, userId int, products [
 	return orderId, nil
 }
 
-func (r *OrderRepository) GetOrder(id int) (*models.Order, error) {
+func (r *OrderRepository) GetOrder(ctx context.Context, id int) (*models.Order, error) {
 	r.logger.Debug("[OrderRepository] Getting order", "id", id)
 
 	var order models.Order
@@ -87,7 +88,7 @@ func (r *OrderRepository) GetOrder(id int) (*models.Order, error) {
 	return &order, nil
 }
 
-func (r *OrderRepository) DeleteOrder(id int) error {
+func (r *OrderRepository) DeleteOrder(ctx context.Context, id int) error {
 	r.logger.Debug("[OrderRepository] Deleting order", "id", id)
 
 	result, err := r.db.Exec("DELETE FROM orders WHERE id = $1", id)
@@ -111,7 +112,7 @@ func (r *OrderRepository) DeleteOrder(id int) error {
 	return nil
 }
 
-func (r *OrderRepository) MarkDeletedProduct(productId int) error {
+func (r *OrderRepository) MarkDeletedProduct(ctx context.Context, productId int) error {
 	r.logger.Debug("[OrderRepository] Marking Deleted core", "productId", productId)
 
 	_, err := r.db.Exec(

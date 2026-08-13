@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -18,7 +19,7 @@ func NewUserRepository(db *sql.DB, logger *slog.Logger) *UserRepository {
 	}
 }
 
-func (r *UserRepository) CreateUser(name, email, passwordHash string) (int, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, name, email, passwordHash string) (int, error) {
 	r.logger.Debug("[UserRepository] Creating user", "name", name, "email", email)
 
 	var id int

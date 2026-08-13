@@ -147,7 +147,7 @@ func main() {
 	// Запуск GRPC-сервера
 	productGRPCServer := core.NewProductGRPCServer(productService, logger)
 
-	// todo: добавить gRPC клиент для запросов в order (сначала придумать зачем core-сервису забронированные товары)
+	// todo: добавить gRPC клиент для запросов в order (когда будет БТ по запросу забронированных товаров из order-сервиса)
 
 	go func() {
 		if err := productGRPCServer.Start(grpcPort); err != nil {
