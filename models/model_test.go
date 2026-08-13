@@ -1,12 +1,15 @@
 package models
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestProduct_Struct(t *testing.T) {
 	product := Product{
-		ID:    1,
-		Name:  "test",
-		Price: 1,
+		ID:     1,
+		Name:   "test",
+		Price:  1,
+		Amount: 1,
 	}
 
 	if product.ID != 1 {
@@ -19,5 +22,9 @@ func TestProduct_Struct(t *testing.T) {
 
 	if product.Price != 1 {
 		t.Errorf("price = %d, expected 1", product.Price)
+	}
+
+	if product.Amount != 1 {
+		t.Errorf("amount = %d, expected 1", product.Amount)
 	}
 }

@@ -1,24 +1,27 @@
 syntax = "proto3";
 
-// Указываем пакет для Go-кода
-// последняя часть (pb) — это имя директории, куда сгенерируются файлы
 option go_package = "go-learn/api/grpc/pb";
 
 package product;
 
-// Запрос: нужен только ID
+// Запрос ORDER->CORE: нужен только ID товара
 message GetProductRequest {
-  int32 product_id = 1;
+  repeated int64 product_ids = 1;
 }
 
-// Ответ: все поля товара
-message ProductResponse {
-  int32 id = 1;
+// Ответ CORE->ORDER: все поля товара
+message Product {
+  int64 id = 1;
   string name = 2;
-  int32 price = 3;
+  int64 price = 3;
+  int64 amount = 4;
 }
 
-// Сервис с методом для получения товара
+message ProductResponse {
+  repeated Product products = 1;
+}
+
+// Сервис для получения товара из core-сервиса
 service ProductService {
-  rpc GetProduct (GetProductRequest) returns (ProductResponse);
+  rpc GetProducts (GetProductRequest) returns (ProductResponse);
 }
