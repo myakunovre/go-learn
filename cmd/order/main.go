@@ -81,7 +81,10 @@ func main() {
 	}
 	defer db.Close()
 
-	err = db.Ping()
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer dbCancel()
+
+	err = db.PingContext(dbCtx)
 	if err != nil {
 		logger.Error("Не удалось подключиться к Postgres", "error", err)
 		os.Exit(1)
@@ -101,8 +104,10 @@ func main() {
 	}()
 
 	// Проверка соединения с Redis
-	ctx := context.Background()
-	err = redisClient.Ping(ctx).Err()
+	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer redisCancel()
+
+	err = redisClient.Ping(redisCtx).Err()
 	if err != nil {
 		logger.Error("Не удалось подключиться к Redis", "error", err)
 		os.Exit(1)
@@ -143,7 +148,9 @@ func main() {
 	productConsumer := orders.NewProductConsumer(brokers, orderService, orderCacheService, logger)
 	defer productConsumer.Close()
 
-	ctx = context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	productConsumer.Start(ctx)
 
 	// === ХЕНДЛЕР ===
@@ -186,21 +193,19 @@ func main() {
 		logger.Info("🌐 Started to http://localhost:" + serverPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Ошибка запуска сервера", "error", err)
-			os.Exit(1)
+			cancel()
 		}
 	}()
 
 	// === ОЖИДАНИЕ СИГНАЛА ===
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-ctx.Done()
 
 	logger.Info("🛑 Получен сигнал завершения, начинаем graceful shutdown...")
 	logger.Info(fmt.Sprintf("⏳ Ожидание завершения запросов (макс. %d сек)", shutdownTimeout))
 
 	// Создаем контекст с тайм-аутом
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeout)*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Duration(shutdownTimeout)*time.Second)
+	defer shutdownCancel()
 
 	// === Завершение HTTP сервера ===
 	if err := srv.Shutdown(shutdownCtx); err != nil {

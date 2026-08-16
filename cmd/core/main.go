@@ -85,7 +85,10 @@ func main() {
 	}
 	defer db.Close()
 
-	err = db.Ping()
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer dbCancel()
+
+	err = db.PingContext(dbCtx)
 	if err != nil {
 		logger.Error("Не удалось подключиться к Postgres", "error", err)
 		os.Exit(1)
@@ -105,8 +108,10 @@ func main() {
 	}()
 
 	// Проверка соединения с Redis
-	ctx := context.Background()
-	err = redisClient.Ping(ctx).Err()
+	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer redisCancel()
+
+	err = redisClient.Ping(redisCtx).Err()
 	if err != nil {
 		logger.Error("Не удалось подключиться к Redis", "error", err)
 		os.Exit(1)

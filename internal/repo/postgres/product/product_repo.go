@@ -26,8 +26,7 @@ func (r *ProductRepository) CreateProduct(ctx context.Context, name string, pric
 	r.logger.Debug("[ProductRepository] Creating core", "name", name, "price", price, "amount", amount)
 
 	var id int64
-	err := r.db.QueryRowContext(
-		ctx,
+	err := r.db.QueryRowContext(ctx,
 		"INSERT INTO products (name, price, amount) VALUES ($1, $2, $3) RETURNING id", name, price, amount,
 	).Scan(&id)
 
@@ -44,8 +43,7 @@ func (r *ProductRepository) AddProduct(ctx context.Context, id, amount int64) (i
 	r.logger.Debug("[ProductRepository] Adding core", "id", id, "amount", amount)
 
 	var curAmount int64
-	err := r.db.QueryRowContext(
-		ctx,
+	err := r.db.QueryRowContext(ctx,
 		"SELECT amount FROM products WHERE id = $1", id).Scan(&curAmount)
 
 	if err != nil {
@@ -77,8 +75,7 @@ func (r *ProductRepository) GetProduct(ctx context.Context, id int64) (*models.P
 	r.logger.Debug("[ProductRepository] Getting core", "id", id)
 
 	var product models.Product
-	err := r.db.QueryRowContext(
-		ctx,
+	err := r.db.QueryRowContext(ctx,
 		"SELECT id, name, price, amount FROM products WHERE id = $1", id,
 	).Scan(&product.ID, &product.Name, &product.Price, &product.Amount)
 
@@ -143,7 +140,8 @@ func (r *ProductRepository) GetProductsByIDs(ctx context.Context, ids []int64) (
 func (r *ProductRepository) GetAllProducts(ctx context.Context) ([]models.Product, error) {
 	r.logger.Debug("[ProductRepository] Getting all products")
 
-	rows, err := r.db.QueryContext(ctx, "SELECT id, name, price, amount FROM products")
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, name, price, amount FROM products")
 	if err != nil {
 		r.logger.Error("[ProductRepository] Failed to get all products", "error", err)
 		return nil, fmt.Errorf("failed to query products: %w", err)
@@ -172,7 +170,8 @@ func (r *ProductRepository) GetAllProducts(ctx context.Context) ([]models.Produc
 func (r *ProductRepository) DeleteProduct(ctx context.Context, id int64) error {
 	r.logger.Debug("[ProductRepository] Deleting core]", "id", id)
 
-	result, err := r.db.ExecContext(ctx, "DELETE FROM products WHERE id = $1", id)
+	result, err := r.db.ExecContext(ctx,
+		"DELETE FROM products WHERE id = $1", id)
 	if err != nil {
 		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
 		return fmt.Errorf("failed to delete core: %w", err)
@@ -196,7 +195,8 @@ func (r *ProductRepository) DeleteProduct(ctx context.Context, id int64) error {
 func (r *ProductRepository) DeleteProductWithTransaction(ctx context.Context, tx *sql.Tx, id int64) error {
 	r.logger.Debug("[ProductRepository] Deleting core]", "id", id)
 
-	result, err := tx.ExecContext(ctx, "DELETE FROM products WHERE id = $1", id)
+	result, err := tx.ExecContext(ctx,
+		"DELETE FROM products WHERE id = $1", id)
 	if err != nil {
 		r.logger.Error("[ProductRepository] Failed to delete core", "id", id, "err", err)
 		return fmt.Errorf("failed to delete core: %w", err)

@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"go-learn/internal/facade/rest/handler/models/core"
 	"log/slog"
@@ -10,7 +11,7 @@ import (
 )
 
 type UserService interface {
-	Create(name, email, password string) (int, error)
+	Create(ctx context.Context, name, email, password string) (int, error)
 }
 
 type Handler struct {
@@ -73,7 +74,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	}
 
 	// Создание пользователя через userService
-	id, err := h.userService.Create(req.Name, req.Email, req.Password)
+	id, err := h.userService.Create(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

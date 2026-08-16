@@ -23,7 +23,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, name, email, passwordHa
 	r.logger.Debug("[UserRepository] Creating user", "name", name, "email", email)
 
 	var id int
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(ctx,
 		"INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id", name, email, passwordHash,
 	).Scan(&id)
 

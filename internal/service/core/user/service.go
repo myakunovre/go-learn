@@ -1,17 +1,19 @@
 package user
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserRepository interface {
-	CreateUser(name, email, passwordHash string) (int, error)
+	CreateUser(ctx context.Context, name, email, passwordHash string) (int, error)
 }
 
 type UserService struct {
@@ -33,7 +35,7 @@ func NewUserService(repo UserRepository, logger *slog.Logger) *UserService {
 	}
 }
 
-func (s *UserService) Create(name, email, password string) (int, error) {
+func (s *UserService) Create(ctx context.Context, name, email, password string) (int, error) {
 	// Проверка email на валидность
 	if !isValidEmailSimple(email) {
 		s.logger.Error("[UserService] Email is not valid", "email", email)
@@ -48,7 +50,10 @@ func (s *UserService) Create(name, email, password string) (int, error) {
 		return 0, err
 	}
 
-	id, err := s.repo.CreateUser(name, email, string(passwordHash))
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	id, err := s.repo.CreateUser(dbCtx, name, email, string(passwordHash))
 	if err != nil {
 		s.logger.Error("[UserService] Error of creating user", "name", name, "email", email, "error", err)
 		return 0, fmt.Errorf("user creation failed: %w", err)

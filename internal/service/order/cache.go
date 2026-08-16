@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 type OrderCacheRepository interface {
 	IncrementOrder(ctx context.Context, productID int64) (int64, error)
 	GetOrder(ctx context.Context, productID int64) (int64, error)
 	DeleteProductFromOrder(ctx context.Context, productID int64) error
-	//GetAllOrders(ctx context.Context) (map[int64]int64, error)
 	GetAllOrders(ctx context.Context) ([]OrderProduct, error)
 }
 
@@ -30,7 +30,10 @@ func (s *OrderCacheService) BuyProduct(ctx context.Context, productID int64) (in
 		return 0, errors.New("core id should be greater than zero")
 	}
 
-	totalOrders, err := s.repo.IncrementOrder(ctx, productID)
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	totalOrders, err := s.repo.IncrementOrder(cacheCtx, productID)
 	if err != nil {
 		s.logger.Error("[OrderCacheService] Error increment order for core", "id", productID, "err", err)
 		return 0, fmt.Errorf("failed to increment order: %w", err)
@@ -46,7 +49,10 @@ func (s *OrderCacheService) GetOrderCount(ctx context.Context, productID int64) 
 		return 0, errors.New("core id should be greater than zero")
 	}
 
-	count, err := s.repo.GetOrder(ctx, productID)
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	count, err := s.repo.GetOrder(cacheCtx, productID)
 	if err != nil {
 		s.logger.Error("[OrderCacheService] Error get order count", "id", productID, "err", err)
 		return 0, fmt.Errorf("failed to get order: %w", err)
@@ -62,7 +68,10 @@ func (s *OrderCacheService) DeleteProduct(ctx context.Context, productID int64) 
 		return errors.New("core id should be greater than zero")
 	}
 
-	err := s.repo.DeleteProductFromOrder(ctx, productID)
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	err := s.repo.DeleteProductFromOrder(cacheCtx, productID)
 	if err != nil {
 		s.logger.Error("[OrderCacheService] Error delete core", "id", productID, "err", err)
 		return fmt.Errorf("failed to delete core: %w", err)
@@ -72,9 +81,11 @@ func (s *OrderCacheService) DeleteProduct(ctx context.Context, productID int64) 
 	return nil
 }
 
-// func (s *OrderCacheService) GetAllProducts(ctx context.Context) (map[int64]int64, error) {
 func (s *OrderCacheService) GetAllProducts(ctx context.Context) ([]OrderProduct, error) {
-	products, err := s.repo.GetAllOrders(ctx)
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	products, err := s.repo.GetAllOrders(cacheCtx)
 	if err != nil {
 		s.logger.Error("[OrderCacheService] Error get all products", "err", err)
 		return nil, fmt.Errorf("failed to get all products: %w", err)
