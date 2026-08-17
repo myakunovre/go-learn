@@ -47,6 +47,10 @@ func (c *ProductConsumer) Start(ctx context.Context) {
 			default:
 				msg, err := c.reader.ReadMessage(ctx)
 				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+
 					c.logger.Error("Failed to read message", "error", err)
 					continue
 				}
