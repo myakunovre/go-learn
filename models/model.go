@@ -29,7 +29,8 @@ type Session struct {
 
 // Order - сущность товара
 type Order struct {
-	ID          int    `json:"id"`
-	Description string `json:"description"`
-	UserId      int    `json:"userId"`
+	ID                int    `json:"id"`
+	Description       string `json:"description"`
+	UserId            int    `json:"userId"`
+	DeliveryTimeHours int    `json:"deliveryTimeHours"`
 }
