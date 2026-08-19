@@ -27,7 +27,7 @@ func (r *OrderRepository) FindOrderIDByUser(ctx context.Context, userId int64) (
 
 	var orderId int
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id FROM order WHERE userId = $1 ORDER BY id DESC LIMIT 1", userId,
+		"SELECT id FROM orders WHERE user_id = $1 ORDER BY id DESC LIMIT 1", userId,
 	).Scan(&orderId)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -131,7 +131,7 @@ func (r *OrderRepository) MergeOrder(
 		ctx,
 		`
 				UPDATE orders
-				SET delivery_time_hours = GREATEST(delivery_time_hours, $1
+				SET delivery_time_hours = GREATEST(delivery_time_hours, $1)
 				WHERE id = $2
 				`,
 		deliveryTimeHours,
@@ -152,7 +152,7 @@ func (r *OrderRepository) MergeOrder(
 				                         order_id,
 				                         product_id,
 				                         product_name,
-				                         product_amount_in_order,
+				                         product_amount_in_core,
 				                         product_amount_in_order,
 				                         product_price
 				)
@@ -170,12 +170,12 @@ func (r *OrderRepository) MergeOrder(
 				   EXCLUDED.product_price,
 				   
 				   product_name =
-				   EXCLUDED.product_name,
+				   EXCLUDED.product_name
 				`,
 			orderId,
 			product.ProductId,
 			product.ProductName,
-			product.ProductAmountInOrder,
+			product.ProductAmountInCore,
 			product.ProductAmountInOrder,
 			product.ProductPrice,
 		)
