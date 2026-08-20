@@ -14,7 +14,7 @@ import (
 )
 
 type OrderService interface {
-	Create(ctx context.Context, description string, userId int, products []order2.OrderProduct) (int, error)
+	Create(ctx context.Context, input order2.CreateOrderInput) (int, error)
 	Get(ctx context.Context, id int) (*models.Order, error)
 	Delete(ctx context.Context, id int) error
 	MarkDeletedProduct(ctx context.Context, productId int) error
@@ -84,15 +84,22 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		}
 	}
 
-	orderProductsIn := make([]order2.OrderProduct, 0, len(req.Products))
+	products := make([]order2.OrderProduct, 0, len(req.Products))
+
 	for _, product := range req.Products {
-		orderProductsIn = append(orderProductsIn, order2.OrderProduct{
-			ProductId: int(product.ProductId),
+		products = append(products, order2.OrderProduct{
+			ProductID: product.ProductId,
 			Quantity:  product.Quantity,
 		})
 	}
 
-	id, err := h.orderService.Create(c.Request.Context(), req.Description, int(req.UserId), orderProductsIn)
+	input := order2.CreateOrderInput{
+		Description: req.Description,
+		UserID:      req.UserId,
+		Products:    products,
+	}
+
+	id, err := h.orderService.Create(c.Request.Context(), input)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

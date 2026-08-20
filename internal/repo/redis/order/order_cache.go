@@ -142,7 +142,7 @@ func (r *OrderCacheRepository) GetAllOrders(ctx context.Context) ([]order.OrderP
 		}
 
 		orderProducts = append(orderProducts, order.OrderProduct{
-			ProductId: int(productId),
+			ProductID: productId,
 			Quantity:  quantity,
 		})
 	}

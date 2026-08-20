@@ -38,7 +38,7 @@ func (s *OrderGRPCServer) GetBookedProducts(context context.Context, req *pb.Get
 	var result []*pb.BookedProduct
 	for _, bookedProduct := range bookedProducts {
 		prod := &pb.BookedProduct{
-			ProductId: int64(bookedProduct.ProductId),
+			ProductId: bookedProduct.ProductID,
 			Amount:    int32(bookedProduct.Quantity),
 		}
 		result = append(result, prod)
