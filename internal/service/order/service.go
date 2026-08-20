@@ -8,13 +8,14 @@ import (
 	"go-learn/internal/domain/order"
 	"go-learn/models"
 	"log/slog"
+	"time"
 )
 
 type OrderRepository interface {
-	CreateOrder(description string, userId int, products []order.Product) (int, error)
-	GetOrder(id int) (*models.Order, error)
-	DeleteOrder(id int) error
-	MarkDeletedProduct(productId int) error
+	CreateOrder(ctx context.Context, description string, userId int, products []order.Product) (int, error)
+	GetOrder(ctx context.Context, id int) (*models.Order, error)
+	DeleteOrder(ctx context.Context, id int) error
+	MarkDeletedProduct(ctx context.Context, productId int) error
 }
 
 type CoreGRPCClient interface {
@@ -59,14 +60,15 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 	// todo: проверить этот блок кода (получение товаров по gRPC из core-сервиса)
 	// Создаем слайс с ID товаров для запроса из core-сервиса по gRPC
 	productIDs := make([]int64, 0, len(orderProducts))
-	//quantities := make([]int64, 0, len(orderProducts))
 	for _, product := range orderProducts {
 		productIDs = append(productIDs, int64(product.ProductId))
-		//quantities = append(quantities, int64(product.Quantity))
 	}
 
 	// Получаем товары по ID из core-сервиса по gRPC
-	productsFromCore, err := s.coreGRPCClient.GetProducts(context.Background(), productIDs)
+	grpcCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+	defer cancel()
+
+	productsFromCore, err := s.coreGRPCClient.GetProducts(grpcCtx, productIDs)
 	if err != nil {
 		s.logger.Error("[OrderService] fail to get products from core", "error", err)
 		return 0, errors.New("fail to get products from core")
@@ -97,7 +99,10 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 		})
 	}
 
-	id, err := s.repo.CreateOrder(description, userId, productsToOrder)
+	dbCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+	defer cancel()
+
+	id, err := s.repo.CreateOrder(dbCtx, description, userId, productsToOrder)
 	if err != nil {
 		s.logger.Error("[OrderService] Error of creating order", "description", description, "error", err)
 		return 0, fmt.Errorf("order creation failed: %w", err)
@@ -107,13 +112,16 @@ func (s *OrderService) Create(ctx context.Context, description string, userId in
 	return id, nil
 }
 
-func (s *OrderService) Get(id int) (*models.Order, error) {
+func (s *OrderService) Get(ctx context.Context, id int) (*models.Order, error) {
 	if id <= 0 {
 		s.logger.Warn("order id should be greater than zero")
 		return nil, errors.New("order id should be greater than zero")
 	}
 
-	order, err := s.repo.GetOrder(id)
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	order, err := s.repo.GetOrder(dbCtx, id)
 	if err != nil {
 		s.logger.Error("[OrderService] Error of getting order", "id", id, "error", err)
 		return nil, fmt.Errorf("order get failed: %w", err)
@@ -129,7 +137,10 @@ func (s *OrderService) Delete(ctx context.Context, id int) error {
 		return errors.New("order id should be greater than zero")
 	}
 
-	err := s.repo.DeleteOrder(id)
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	err := s.repo.DeleteOrder(dbCtx, id)
 	if err != nil {
 		s.logger.Error("[OrderService] Error of deleting order", "id", id, "error", err)
 		return fmt.Errorf("failed to delete order with id %d: %w", id, err)
@@ -140,13 +151,16 @@ func (s *OrderService) Delete(ctx context.Context, id int) error {
 }
 
 // MarkDeletedProduct маркирует удаленные товары во всех заказах (order_items)
-func (s *OrderService) MarkDeletedProduct(productId int) error {
+func (s *OrderService) MarkDeletedProduct(ctx context.Context, productId int) error {
 	if productId <= 0 {
 		s.logger.Warn("core id should be greater than zero")
 		return errors.New("core id should be greater than zero")
 	}
 
-	err := s.repo.MarkDeletedProduct(productId)
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	err := s.repo.MarkDeletedProduct(dbCtx, productId)
 	if err != nil {
 		s.logger.Error("[OrderService] Error marking core", "productId", productId, "error", err)
 		return fmt.Errorf("failed to mark deleted core with id %d: %w", productId, err)

@@ -26,7 +26,10 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, description string, u
 	r.logger.Debug("[OrderRepository] Creating order", "description", description, "userId", userId)
 
 	// Создаем транзакцию, т.к. добавляем данные в две таблицы
-	tx, err := r.db.Begin()
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{
+		Isolation: sql.LevelReadCommitted,
+		ReadOnly:  false,
+	})
 	if err != nil {
 		r.logger.Error("[OrderRepository] Failed to start transaction", "error", err)
 		return 0, err
@@ -35,20 +38,19 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, description string, u
 
 	// добавление в таблицу orders
 	var orderId int
-	err = tx.QueryRow(
+	err = tx.QueryRowContext(ctx,
 		"INSERT INTO orders (description, user_id) VALUES ($1, $2) RETURNING id", description, userId,
 	).Scan(&orderId)
-
 	if err != nil {
 		r.logger.Error("[OrderRepository] Failed to create order", "err", err)
 		return 0, fmt.Errorf("failed to create order: %w", err)
 	}
 
+	// todo: похоже на цикл в запросах БД
 	// добавление в таблицу order_items
 	for _, product := range products {
-
-		_, err := tx.Exec(
-			"INSERT INTO order_items (order_id, product_id, product_name, product_amount_in_core, product_amount_in_order, product_price) VALUES ($1, $2, $3, $4, $5)",
+		_, err := tx.ExecContext(ctx,
+			"INSERT INTO order_items (order_id, product_id, product_name, product_amount_in_core, product_amount_in_order, product_price) VALUES ($1, $2, $3, $4, $5, $6)",
 			orderId, product.ProductId, product.ProductName, product.ProductAmountInCore, product.ProductAmountInOrder, product.ProductPrice,
 		)
 		if err != nil {
@@ -70,7 +72,7 @@ func (r *OrderRepository) GetOrder(ctx context.Context, id int) (*models.Order, 
 	r.logger.Debug("[OrderRepository] Getting order", "id", id)
 
 	var order models.Order
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(ctx,
 		"SELECT id, description, uder_id FROM orders WHERE id = $1", id,
 	).Scan(&order.ID, &order.Description, &order.UserId)
 
@@ -91,7 +93,8 @@ func (r *OrderRepository) GetOrder(ctx context.Context, id int) (*models.Order, 
 func (r *OrderRepository) DeleteOrder(ctx context.Context, id int) error {
 	r.logger.Debug("[OrderRepository] Deleting order", "id", id)
 
-	result, err := r.db.Exec("DELETE FROM orders WHERE id = $1", id)
+	result, err := r.db.ExecContext(ctx,
+		"DELETE FROM orders WHERE id = $1", id)
 	if err != nil {
 		r.logger.Error("[OrderRepository] Failed to delete order", "id", id, "err", err)
 		return fmt.Errorf("failed to delete order: %w", err)
@@ -115,7 +118,7 @@ func (r *OrderRepository) DeleteOrder(ctx context.Context, id int) error {
 func (r *OrderRepository) MarkDeletedProduct(ctx context.Context, productId int) error {
 	r.logger.Debug("[OrderRepository] Marking Deleted core", "productId", productId)
 
-	_, err := r.db.Exec(
+	_, err := r.db.ExecContext(ctx,
 		"UPDATE order_items SET item_exists = false WHERE product_id = $1", productId,
 	)
 	if err != nil {

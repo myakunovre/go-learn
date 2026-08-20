@@ -47,17 +47,21 @@ func (c *ProductConsumer) Start(ctx context.Context) {
 			default:
 				msg, err := c.reader.ReadMessage(ctx)
 				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+
 					c.logger.Error("Failed to read message", "error", err)
 					continue
 				}
 
-				c.handleMessage(msg)
+				c.handleMessage(ctx, msg)
 			}
 		}
 	}()
 }
 
-func (c *ProductConsumer) handleMessage(msg kafka.Message) {
+func (c *ProductConsumer) handleMessage(ctx context.Context, msg kafka.Message) {
 	switch string(msg.Key) {
 	case "core.deleted":
 		var event events.ProductDeleted
@@ -68,13 +72,13 @@ func (c *ProductConsumer) handleMessage(msg kafka.Message) {
 		c.logger.Info("Product deleted event received", "product_id", event.ProductID)
 
 		// Помечаем удаленный товар в DB Order-сервиса
-		err := c.orderService.MarkDeletedProduct(int(event.ProductID))
+		err := c.orderService.MarkDeletedProduct(ctx, int(event.ProductID))
 		if err != nil {
 			c.logger.Error("Failed to mark deleted core", "error", err)
 		}
 
 		// Очищаем кэш заказов для удаленного продукта
-		err = c.orderCacheService.DeleteProduct(context.Background(), event.ProductID)
+		err = c.orderCacheService.DeleteProduct(ctx, event.ProductID)
 		if err != nil {
 			c.logger.Error("Failed to delete core from OrderCache", "error", err)
 		}

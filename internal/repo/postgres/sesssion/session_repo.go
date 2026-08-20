@@ -19,7 +19,7 @@ func NewAuthRepository(db *sql.DB, logger *slog.Logger) *AuthRepository {
 
 func (r *AuthRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	var user models.User
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(ctx,
 		"SELECT id, name, email, password_hash FROM users WHERE email = $1",
 		email,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash)
@@ -34,7 +34,7 @@ func (r *AuthRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 }
 
 func (r *AuthRepository) CreateSession(ctx context.Context, session *models.Session) error {
-	return r.db.QueryRow(
+	return r.db.QueryRowContext(ctx,
 		"INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING id",
 		session.UserID, session.Token, session.ExpiresAt,
 	).Scan(&session.ID)
@@ -42,7 +42,7 @@ func (r *AuthRepository) CreateSession(ctx context.Context, session *models.Sess
 
 func (r *AuthRepository) GetSessionByToken(ctx context.Context, token string) (*models.Session, error) {
 	var session models.Session
-	err := r.db.QueryRow(
+	err := r.db.QueryRowContext(ctx,
 		"SELECT id, user_id, token, expires_at, created_at FROM sessions WHERE token = $1",
 		token,
 	).Scan(&session.ID, &session.UserID, &session.Token, &session.ExpiresAt, &session.CreatedAt)
@@ -57,6 +57,7 @@ func (r *AuthRepository) GetSessionByToken(ctx context.Context, token string) (*
 }
 
 func (r *AuthRepository) DeleteSession(ctx context.Context, token string) error {
-	_, err := r.db.Exec("DELETE FROM sessions WHERE token = $1", token)
+	_, err := r.db.ExecContext(ctx,
+		"DELETE FROM sessions WHERE token = $1", token)
 	return err
 }

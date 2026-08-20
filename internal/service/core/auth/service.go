@@ -14,10 +14,10 @@ import (
 )
 
 type AuthRepository interface {
-	GetUserByEmail(email string) (*models.User, error)
-	CreateSession(session *models.Session) error
-	GetSessionByToken(token string) (*models.Session, error)
-	DeleteSession(token string) error
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	CreateSession(ctx context.Context, session *models.Session) error
+	GetSessionByToken(ctx context.Context, token string) (*models.Session, error)
+	DeleteSession(ctx context.Context, token string) error
 }
 
 type SessionCache interface {
@@ -37,7 +37,10 @@ func NewAuthService(repo AuthRepository, cache SessionCache, logger *slog.Logger
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
-	user, err := s.repo.GetUserByEmail(email)
+	dbCtx, dbCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dbCancel()
+
+	user, err := s.repo.GetUserByEmail(dbCtx, email)
 	if err != nil {
 		return "", fmt.Errorf("invalid credentials: %w", err)
 	}
@@ -60,12 +63,15 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	}
 
 	// Сохраняем в БД
-	if err := s.repo.CreateSession(session); err != nil {
+	if err := s.repo.CreateSession(dbCtx, session); err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
 	// Кэшируем с TTL 30 секунд
-	if err := s.cache.SetSession(ctx, token, int(user.ID), 30*time.Second); err != nil {
+	if err := s.cache.SetSession(cacheCtx, token, int(user.ID), 30*time.Second); err != nil {
 		s.logger.Warn("Failed to redis session", "error", err)
 	}
 
@@ -75,19 +81,25 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 
 func (s *AuthService) Authenticate(ctx context.Context, token string) (int, error) {
 	// Сначала проверяем кэш
-	userID, err := s.cache.GetSession(ctx, token)
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	userID, err := s.cache.GetSession(cacheCtx, token)
 	if err == nil {
 		return userID, nil
 	}
 
 	// Если нет в кэше, проверяем БД
-	session, err := s.repo.GetSessionByToken(token)
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	session, err := s.repo.GetSessionByToken(dbCtx, token)
 	if err != nil {
 		return 0, errors.New("invalid or expired token")
 	}
 
 	if time.Now().After(session.ExpiresAt) {
-		s.repo.DeleteSession(token)
+		s.repo.DeleteSession(dbCtx, token)
 		return 0, errors.New("token expired")
 	}
 
@@ -96,14 +108,25 @@ func (s *AuthService) Authenticate(ctx context.Context, token string) (int, erro
 	if ttl > 30*time.Second {
 		ttl = 30 * time.Second
 	}
-	s.cache.SetSession(ctx, token, session.UserID, ttl)
+
+	cacheCtx2, cacheCancel2 := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel2()
+
+	s.cache.SetSession(cacheCtx2, token, session.UserID, ttl)
 
 	return session.UserID, nil
 }
 
 func (s *AuthService) Logout(ctx context.Context, token string) error {
-	if err := s.repo.DeleteSession(token); err != nil {
+	dbCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := s.repo.DeleteSession(dbCtx, token); err != nil {
 		return err
 	}
-	return s.cache.DeleteSession(ctx, token)
+
+	cacheCtx, cacheCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cacheCancel()
+
+	return s.cache.DeleteSession(cacheCtx, token)
 }

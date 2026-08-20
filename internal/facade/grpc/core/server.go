@@ -27,7 +27,7 @@ func NewProductGRPCServer(prodService *product.ProductService, logger *slog.Logg
 func (s *ProductGRPCServer) GetProducts(ctx context.Context, req *pb.GetProductRequest) (*pb.ProductResponse, error) {
 	IDs := req.GetProductIds()
 
-	products, err := s.prodService.GetProductsByIDs(IDs)
+	products, err := s.prodService.GetProductsByIDs(ctx, IDs)
 	if err != nil {
 		s.logger.Error("[gRPC ProductService] Error of getting products", "id", IDs, "error", err)
 		return nil, fmt.Errorf("core get failed: %w", err)

@@ -15,9 +15,9 @@ import (
 
 type OrderService interface {
 	Create(ctx context.Context, description string, userId int, products []order2.OrderProduct) (int, error)
-	Get(id int) (*models.Order, error)
+	Get(ctx context.Context, id int) (*models.Order, error)
 	Delete(ctx context.Context, id int) error
-	MarkDeletedProduct(productId int) error
+	MarkDeletedProduct(ctx context.Context, productId int) error
 }
 
 type Handler struct {
@@ -73,12 +73,14 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 				"error": "product id can not be less than zero",
 			})
 			h.logger.Warn("product id can not be less than zero")
+			return
 		}
 		if product.Quantity <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "product quantity can not be less than zero",
 			})
 			h.logger.Warn("product quantity can not be less than zero")
+			return
 		}
 	}
 
@@ -132,7 +134,7 @@ func (h *Handler) GetOrderById(c *gin.Context) {
 		return
 	}
 
-	order, err := h.orderService.Get(id)
+	order, err := h.orderService.Get(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
